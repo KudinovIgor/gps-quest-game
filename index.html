@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GPS Гео-Квест</title>
     
-    <!-- ПОДКЛЮЧАЕМ НАДЕЖНЫЙ ЯНДЕКС CDN ВМЕСТО ЗАБЛОКИРОВАННЫХ СЕРВИСОВ -->
-    <link rel="stylesheet" href="https://yastatic.net" />
-    <script src="https://yastatic.net"></script>
+    <!-- ПОДКЛЮЧАЕМ ЛОКАЛЬНЫЕ ФАЙЛЫ ИЗ ТВОЕГО РЕПОЗИТОРИЯ -->
+    <link rel="stylesheet" href="leaflet.css" />
+    <script src="leaflet.js"></script>
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
@@ -33,18 +33,16 @@
 
     <div id="ui-panel">
         <h3 id="quest-title">Настройка карт...</h3>
-        <p id="quest-desc">Загружаем стабильные слои карты и проверяем датчики.</p>
+        <p id="quest-desc">Загружаем локальные слои карты и проверяем датчики.</p>
         <input type="text" id="answer-input" placeholder="Введите ваш ответ...">
         <button id="action-btn" disabled>Открыть задание</button>
     </div>
 
     <script>
-        // === НАСТРОЙКА SUPABASE ===
         const SUPABASE_URL = "https://supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8";
 
         // === КООРДИНАТЫ ДЛЯ ТЕСТОВ ДОМА ===
-        // Поставь сюда координаты своего реального дома, чтобы маркер игрока сразу встал куда нужно!
         const HOME_LAT = 55.7558; 
         const HOME_LNG = 37.6173;
 
@@ -58,7 +56,7 @@
             // Инициализируем карту
             map = L.map('map', { zoomControl: false }).setView([HOME_LAT, HOME_LNG], 16);
             
-            // Сервер Яндекс.Карт
+            // Сверхстабильный сервер Яндекс.Карт
             L.tileLayer('https://yandex.net{x}&y={y}&z={z}&scale=1&lang=ru_RU', {
                 maxZoom: 18,
                 attribution: '© Яндекс.Карты'
@@ -110,7 +108,7 @@
         }
 
         function onLocationError(error) {
-            console.warn(`GPS недоступен. Включаем симулятор...`);
+            console.warn(`GPS недоступен. Переключаемся на симулятор...`);
             activateSimulator(`Симулятор активен (Поиск спутников...)`);
         }
 
@@ -155,7 +153,7 @@
             if (!insideZone) {
                 activeQuest = null;
                 document.getElementById('quest-title').innerText = "🗺️ Исследуйте местность";
-                document.getElementById('quest-desc').innerText = "Ищите зеленые круги. Переместитесь в них (или настройте координаты в Supabase под координаты HOME).";
+                document.getElementById('quest-desc').innerText = "Ищите зеленые круги. Переместитесь в них.";
                 document.getElementById('action-btn').disabled = true;
                 document.getElementById('action-btn').innerText = "Открыть задание";
                 document.getElementById('answer-input').style.display = "none";
