@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GPS Гео-Квест</title>
     
-    <!-- Железобетонный CDN от Яндекса, который не блокируется и не сбоит из-за QUIC -->
-    <link rel="stylesheet" href="https://yastatic.net" />
-    <script src="https://yastatic.net"></script>
+    <!-- ПОДКЛЮЧАЕМ ОФИЦИАЛЬНЫЙ API ЯНДЕКС КАРТ -->
+    <script src="https://yandex.ru" type="text/javascript"></script>
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
@@ -32,8 +31,8 @@
     <div id="map"></div>
 
     <div id="ui-panel">
-        <h3 id="quest-title">Настройка карт...</h3>
-        <p id="quest-desc">Загружаем стабильные слои карты и проверяем датчики.</p>
+        <h3 id="quest-title">Настройка Яндекс Карт...</h3>
+        <p id="quest-desc">Загружаем карту и проверяем датчики.</p>
         <input type="text" id="answer-input" placeholder="Введите ваш ответ...">
         <button id="action-btn" disabled>Открыть задание</button>
     </div>
@@ -43,33 +42,33 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8";
 
         // === КООРДИНАТЫ ДЛЯ ТЕСТОВ ДОМА ===
-        // Укажи здесь координаты своего дома, чтобы симулятор сработал прямо в комнате
+        // Впиши сюда свои координаты (Широта, Долгота)
         const HOME_LAT = 55.7558; 
         const HOME_LNG = 37.6173;
 
-        let map, playerMarker, playerRadius;
+        let myMap;
+        let playerPlacemark, playerCircle;
         let quests = [];
         let activeQuest = null;
         let isQuestOpened = false;
         const ACTIVATION_RADIUS = 20; 
 
-        window.onload = function() {
-            // Проверяем, загрузилась ли библиотека карт Яндекса
-            if (typeof L === 'undefined') {
-                document.getElementById('quest-title').innerText = "⚠️ Ошибка загрузки";
-                document.getElementById('quest-desc').innerText = "Не удалось загрузить скрипты карт. Попробуйте обновить страницу.";
-                return;
-            }
+        // Инициализация Яндекс Карт
+        if (typeof ymaps !== 'undefined') {
+            ymaps.ready(initHasMaps);
+        } else {
+            document.getElementById('quest-title').innerText = "⚠️ Критическая ошибка";
+            document.getElementById('quest-desc').innerText = "Яндекс API заблокирован провайдером.";
+        }
 
-            // Инициализируем карту
-            map = L.map('map', { zoomControl: false }).setView([HOME_LAT, HOME_LNG], 16);
-            
-            // Загружаем подложку Яндекс.Карт
-            L.tileLayer('https://yandex.net{x}&y={y}&z={z}&scale=1&lang=ru_RU', {
-                maxZoom: 18,
-                attribution: '© Яндекс.Карты'
-            }).addTo(map);
+        function initHasMaps() {
+            myMap = new ymaps.Map("map", {
+                center: [HOME_LAT, HOME_LNG],
+                zoom: 16,
+                controls: [] // Убираем лишние кнопки
+            });
 
+            // Пробуем запустить GPS
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(onLocationSuccess, onLocationError, {
                     enableHighAccuracy: true, maximumAge: 1000, timeout: 8000
@@ -77,7 +76,7 @@
             } else {
                 activateSimulator("Браузер не поддерживает геопозицию");
             }
-        };
+        }
 
         async function loadQuests() {
             try {
@@ -87,11 +86,22 @@
                 quests = await response.json();
                 
                 quests.forEach(quest => {
-                    L.circle([quest.latitude, quest.longitude], {
-                        color: '#28a745', fillColor: '#28a745', fillOpacity: 0.2, radius: ACTIVATION_RADIUS
-                    }).addTo(map);
+                    // Рисуем зеленую зону
+                    let questCircle = new ymaps.Circle([
+                        [quest.latitude, quest.longitude],
+                        ACTIVATION_RADIUS
+                    ], {
+                        balloonContent: quest.title
+                    }, {
+                        fillColor: '#28a745', fillOpacity: 0.2, strokeColor: '#28a745', strokeWidth: 1
+                    });
+                    myMap.geoObjects.add(questCircle);
 
-                    L.marker([quest.latitude, quest.longitude]).addTo(map).bindPopup(`<b>${quest.title}</b>`);
+                    // Рисуем метку
+                    let questPlacemark = new ymaps.Placemark([quest.latitude, quest.longitude], {
+                        hintContent: quest.title, balloonContent: quest.title
+                    });
+                    myMap.geoObjects.add(questPlacemark);
                 });
             } catch (err) {
                 console.error("Ошибка базы данных:", err);
@@ -116,8 +126,7 @@
         }
 
         function onLocationError(error) {
-            console.warn("GPS недоступен. Включаем симулятор...");
-            activateSimulator("Симулятор активен");
+            activateSimulator("Симулятор активен (Поиск спутников...)");
         }
 
         function activateSimulator(statusMessage) {
@@ -126,14 +135,21 @@
         }
 
         function updatePlayerMarker(lat, lng) {
-            if (!playerMarker) {
-                playerMarker = L.marker([lat, lng]).addTo(map);
-                playerRadius = L.circle([lat, lng], { radius: ACTIVATION_RADIUS, color: '#007bff', fillOpacity: 0.15 }).addTo(map);
-                map.setView([lat, lng], 17);
+            if (!playerPlacemark) {
+                // Создаем метку игрока
+                playerPlacemark = new ymaps.Placemark([lat, lng], {}, { preset: 'islands#blueCircleDotIcon' });
+                // Синий радиус радара
+                playerCircle = new ymaps.Circle([[lat, lng], ACTIVATION_RADIUS], {}, {
+                    fillColor: '#007bff', fillOpacity: 0.15, strokeColor: '#007bff', strokeWidth: 1
+                });
+
+                myMap.geoObjects.add(playerPlacemark);
+                myMap.geoObjects.add(playerCircle);
+                myMap.setCenter([lat, lng], 17);
                 loadQuests(); 
             } else {
-                playerMarker.setLatLng([lat, lng]);
-                playerRadius.setLatLng([lat, lng]);
+                playerPlacemark.geometry.setCoordinates([lat, lng]);
+                playerCircle.geometry.setCoordinates([lat, lng]);
             }
 
             if (!isQuestOpened) {
@@ -161,7 +177,7 @@
             if (!insideZone) {
                 activeQuest = null;
                 document.getElementById('quest-title').innerText = "🗺️ Исследуйте местность";
-                document.getElementById('quest-desc').innerText = "Ищите зеленые круги. Переместитесь в них.";
+                document.getElementById('quest-desc').innerText = "Ищите зеленые круги на карте Яндекс.";
                 document.getElementById('action-btn').disabled = true;
                 document.getElementById('action-btn').innerText = "Открыть задание";
                 document.getElementById('answer-input').style.display = "none";
