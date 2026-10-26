@@ -20,7 +20,7 @@
         input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #00e5ff; 
                 background: #070b12; color: #00e5ff; border-radius: 6px; box-sizing: border-box; font-size: 16px; display: none; text-align: center; font-family: inherit; }
         h3 { margin: 0 0 8px 0; letter-spacing: 1px; }
-        p { margin: 0 0 12px 0; color: #8ab4f8; font-size: 13px; }
+        p { margin: 0 0 12px 0; color: #8ab4f8; font-size: 13px; line-height: 1.3; }
     </style>
 </head>
 <body>
@@ -37,11 +37,11 @@
     </div>
 
     <script>
+        // === ВНИМАНИЕ: ВСТАВЬ СЮДА СВОИ ДАННЫЕ ВМЕСТО ШАБЛОННЫХ ===
         const SUPABASE_URL = "https://supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8";
 
         // === ТВОИ ДОМАШНИЕ КООРДИНАТЫ ДЛЯ ТЕСТА ===
-        // Вставь сюда свои цифры из Яндекс.Карт, чтобы увидеть магию прямо в комнате!
         const HOME_LAT = 55.7558; 
         const HOME_LNG = 37.6173;
 
@@ -52,7 +52,7 @@
         const ACTIVATION_RADIUS = 20; 
         
         let playerPos = { lat: HOME_LAT, lng: HOME_LNG };
-        let scale = 50000; // Масштаб отображения сетки координат
+        let scale = 150000; // Увеличили масштаб для лучшей видимости точек
 
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
@@ -65,7 +65,7 @@
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(
                     (pos) => { playerPos.lat = pos.coords.latitude; playerPos.lng = pos.coords.longitude; updateGame(); },
-                    () => { updateGame(); }, // При ошибке включается симулятор с HOME координатами
+                    () => { updateGame(); }, 
                     { enableHighAccuracy: true, maximumAge: 1000 }
                 );
             } else {
@@ -76,7 +76,7 @@
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            if(quests.length > 0) draw();
+            draw();
         }
 
         async function loadQuests() {
@@ -84,10 +84,12 @@
                 const response = await fetch(`${SUPABASE_URL}/rest/v1/quests?select=*`, {
                     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
                 });
+                if (!response.ok) throw new Error("Сбой сети или ключей");
                 quests = await response.json();
                 updateGame();
             } catch (err) {
-                document.getElementById('quest-desc').innerText = "ОШИБКА БАЗЫ ДАННЫХ.";
+                console.error(err);
+                document.getElementById('quest-desc').innerText = "ОШИБКА БАЗЫ ДАННЫХ.\nПроверьте API-ключи в коде.";
             }
         }
 
@@ -136,58 +138,52 @@
         }
 
         function draw() {
-            // Очистка экрана
+            if (!ctx) return;
+            
             ctx.fillStyle = "#070b12";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
 
-            // Рисуем сетку навигатора
-            ctx.strokeStyle = "rgba(0, 229, 255, 0.1)";
+            // Сетка
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.05)";
             ctx.lineWidth = 1;
             const gridStep = 40;
             for(let x = 0; x < canvas.width; x += gridStep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
             for(let y = 0; y < canvas.height; y += gridStep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
 
-            // Рисуем круги радара вокруг игрока
-            ctx.strokeStyle = "rgba(0, 229, 255, 0.2)";
-            [100, 200, 300].forEach(r => {
+            // Исправленные круги радара
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.15)";
+            [40, 80, 120, 160].forEach(r => {
                 ctx.beginPath(); ctx.arc(centerX, centerY, r, 0, Math.PI*2); ctx.stroke();
             });
 
-            // Рисуем точки квестов из Supabase
+            // Отображение точек
             quests.forEach(quest => {
-                // Переводим разницу координат в пиксели экрана относительно игрока
                 const qX = centerX + (quest.longitude - playerPos.lng) * scale;
-                const qY = centerY - (quest.latitude - playerPos.lat) * scale; // Минус, так как в Canvas Y идет вниз
+                const qY = centerY - (quest.latitude - playerPos.lat) * scale;
 
-                // Зона квеста (Зеленый пульсирующий круг)
                 ctx.fillStyle = "rgba(0, 255, 102, 0.15)";
                 ctx.strokeStyle = "#00ff66";
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 1.5;
                 ctx.beginPath();
-                ctx.arc(qX, qY, ACTIVATION_RADIUS * (scale/100000), 0, Math.PI*2);
+                ctx.arc(qX, qY, 15, 0, Math.PI*2);
                 ctx.fill();
                 ctx.stroke();
 
-                // Подпись точки
                 ctx.fillStyle = "#00ff66";
-                ctx.font = "12px monospace";
-                ctx.fillText(quest.title, qX + 15, qY + 5);
+                ctx.font = "10px monospace";
+                ctx.fillText(quest.title, qX + 20, qY + 4);
             });
 
-            // Рисуем игрока (Центр экрана)
+            // Маркер игрока
             ctx.fillStyle = "#00e5ff";
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = "#00e5ff";
             ctx.beginPath();
-            ctx.arc(centerX, centerY, 8, 0, Math.PI*2);
+            ctx.arc(centerX, centerY, 6, 0, Math.PI*2);
             ctx.fill();
-            ctx.shadowBlur = 0; // Сброс тени
         }
 
-        // Логика терминала ответов
         document.getElementById('action-btn').addEventListener('click', () => {
             const btn = document.getElementById('action-btn');
             const input = document.getElementById('answer-input');
@@ -202,14 +198,14 @@
                 const correctAnswer = String(activeQuest.answer).trim().toLowerCase();
                 
                 if (userAnswer === correctAnswer) { 
-                    alert("ДОСТУП РАЗРЕШЕН! СЕКТОР ЗАЧИЩЕН.");
+                    alert("ДОСТУП РАЗРЕШЕН!");
                     document.getElementById('quest-title').innerText = "• ВЫПОЛНЕНО •";
-                    document.getElementById('quest-desc').innerText = "Код подошел. База данных обновлена.";
+                    document.getElementById('quest-desc').innerText = "Сектор зачищен успешно.";
                     input.style.display = "none";
                     btn.disabled = true;
                     btn.innerText = "СДЕЛАНO";
                 } else {
-                    alert("ОТКАЗ В ДОСТУПЕ: НЕВЕРНЫЙ КЛЮЧ ЧТЕНИЯ!");
+                    alert("НЕВЕРНЫЙ КОД ДОСТУПА!");
                 }
             }
         });
