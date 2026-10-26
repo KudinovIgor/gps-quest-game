@@ -3,79 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Гео-Квест</title>
-    
-    <!-- ПОДКЛЮЧАЕМ ОФИЦИАЛЬНЫЙ API ЯНДЕКС КАРТ -->
-    <script src="https://yandex.ru" type="text/javascript"></script>
-    
+    <title>GPS Трекер: Квест</title>
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
-        #map { width: 100%; height: 100%; z-index: 1; background: #e5e3df; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: monospace; background: #070b12; color: #00e5ff; overflow: hidden; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        canvas { width: 100%; height: 100%; display: block; }
         #ui-panel {
             position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 10; width: 90%; max-width: 400px; background: white;
-            padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            text-align: center; box-sizing: border-box;
+            z-index: 10; width: 90%; max-width: 400px; background: rgba(10, 20, 38, 0.9);
+            border: 2px solid #00e5ff; padding: 15px; border-radius: 12px; 
+            box-shadow: 0 0 20px rgba(0,229,255,0.3); text-align: center; box-sizing: border-box;
         }
-        button { background: #007bff; color: white; border: none; padding: 10px 20px; 
-                 border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; width: 100%; }
-        button:disabled { background: #ccc; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; 
-                border-radius: 6px; box-sizing: border-box; font-size: 16px; display: none; }
-        h3 { margin: 0 0 8px 0; color: #333; }
-        p { margin: 0 0 12px 0; color: #666; font-size: 14px; }
+        button { background: #00e5ff; color: #070b12; border: none; padding: 12px 20px; 
+                 border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; width: 100%; font-family: inherit; text-transform: uppercase; }
+        button:disabled { background: #102a36; color: #005b66; cursor: not-allowed; }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #00e5ff; 
+                background: #070b12; color: #00e5ff; border-radius: 6px; box-sizing: border-box; font-size: 16px; display: none; text-align: center; font-family: inherit; }
+        h3 { margin: 0 0 8px 0; letter-spacing: 1px; }
+        p { margin: 0 0 12px 0; color: #8ab4f8; font-size: 13px; }
     </style>
 </head>
 <body>
 
-    <div id="map"></div>
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
 
     <div id="ui-panel">
-        <h3 id="quest-title">Настройка Яндекс Карт...</h3>
-        <p id="quest-desc">Загружаем карту и проверяем датчики.</p>
-        <input type="text" id="answer-input" placeholder="Введите ваш ответ...">
-        <button id="action-btn" disabled>Открыть задание</button>
+        <h3 id="quest-title">СИНХРОНИЗАЦИЯ...</h3>
+        <p id="quest-desc">Подключение к спутникам позиционирования.</p>
+        <input type="text" id="answer-input" placeholder="ВВЕДИТЕ ОТВЕТ...">
+        <button id="action-btn" disabled>Открыть терминал</button>
     </div>
 
     <script>
         const SUPABASE_URL = "https://supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8";
 
-        // === КООРДИНАТЫ ДЛЯ ТЕСТОВ ДОМА ===
-        // Впиши сюда свои координаты (Широта, Долгота)
+        // === ТВОИ ДОМАШНИЕ КООРДИНАТЫ ДЛЯ ТЕСТА ===
+        // Вставь сюда свои цифры из Яндекс.Карт, чтобы увидеть магию прямо в комнате!
         const HOME_LAT = 55.7558; 
         const HOME_LNG = 37.6173;
 
-        let myMap;
-        let playerPlacemark, playerCircle;
+        let canvas, ctx;
         let quests = [];
         let activeQuest = null;
         let isQuestOpened = false;
         const ACTIVATION_RADIUS = 20; 
+        
+        let playerPos = { lat: HOME_LAT, lng: HOME_LNG };
+        let scale = 50000; // Масштаб отображения сетки координат
 
-        // Инициализация Яндекс Карт
-        if (typeof ymaps !== 'undefined') {
-            ymaps.ready(initHasMaps);
-        } else {
-            document.getElementById('quest-title').innerText = "⚠️ Критическая ошибка";
-            document.getElementById('quest-desc').innerText = "Яндекс API заблокирован провайдером.";
-        }
+        window.onload = function() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
 
-        function initHasMaps() {
-            myMap = new ymaps.Map("map", {
-                center: [HOME_LAT, HOME_LNG],
-                zoom: 16,
-                controls: [] // Убираем лишние кнопки
-            });
+            loadQuests();
 
-            // Пробуем запустить GPS
             if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(onLocationSuccess, onLocationError, {
-                    enableHighAccuracy: true, maximumAge: 1000, timeout: 8000
-                });
+                navigator.geolocation.watchPosition(
+                    (pos) => { playerPos.lat = pos.coords.latitude; playerPos.lng = pos.coords.longitude; updateGame(); },
+                    () => { updateGame(); }, // При ошибке включается симулятор с HOME координатами
+                    { enableHighAccuracy: true, maximumAge: 1000 }
+                );
             } else {
-                activateSimulator("Браузер не поддерживает геопозицию");
+                updateGame();
             }
+        };
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            if(quests.length > 0) draw();
         }
 
         async function loadQuests() {
@@ -84,27 +85,9 @@
                     headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
                 });
                 quests = await response.json();
-                
-                quests.forEach(quest => {
-                    // Рисуем зеленую зону
-                    let questCircle = new ymaps.Circle([
-                        [quest.latitude, quest.longitude],
-                        ACTIVATION_RADIUS
-                    ], {
-                        balloonContent: quest.title
-                    }, {
-                        fillColor: '#28a745', fillOpacity: 0.2, strokeColor: '#28a745', strokeWidth: 1
-                    });
-                    myMap.geoObjects.add(questCircle);
-
-                    // Рисуем метку
-                    let questPlacemark = new ymaps.Placemark([quest.latitude, quest.longitude], {
-                        hintContent: quest.title, balloonContent: quest.title
-                    });
-                    myMap.geoObjects.add(questPlacemark);
-                });
+                updateGame();
             } catch (err) {
-                console.error("Ошибка базы данных:", err);
+                document.getElementById('quest-desc').innerText = "ОШИБКА БАЗЫ ДАННЫХ.";
             }
         }
 
@@ -119,93 +102,114 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        function onLocationSuccess(position) {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            updatePlayerMarker(lat, lng);
+        function updateGame() {
+            checkGameZones(playerPos.lat, playerPos.lng);
+            draw();
         }
 
-        function onLocationError(error) {
-            activateSimulator("Симулятор активен (Поиск спутников...)");
-        }
-
-        function activateSimulator(statusMessage) {
-            updatePlayerMarker(HOME_LAT, HOME_LNG);
-            document.getElementById('quest-desc').innerText = statusMessage;
-        }
-
-        function updatePlayerMarker(lat, lng) {
-            if (!playerPlacemark) {
-                // Создаем метку игрока
-                playerPlacemark = new ymaps.Placemark([lat, lng], {}, { preset: 'islands#blueCircleDotIcon' });
-                // Синий радиус радара
-                playerCircle = new ymaps.Circle([[lat, lng], ACTIVATION_RADIUS], {}, {
-                    fillColor: '#007bff', fillOpacity: 0.15, strokeColor: '#007bff', strokeWidth: 1
-                });
-
-                myMap.geoObjects.add(playerPlacemark);
-                myMap.geoObjects.add(playerCircle);
-                myMap.setCenter([lat, lng], 17);
-                loadQuests(); 
-            } else {
-                playerPlacemark.geometry.setCoordinates([lat, lng]);
-                playerCircle.geometry.setCoordinates([lat, lng]);
-            }
-
-            if (!isQuestOpened) {
-                checkGameZones(lat, lng);
-            }
-        }
-
-        function checkGameZones(playerLat, playerLng) {
+        function checkGameZones(pLat, pLng) {
+            if(quests.length === 0) return;
             let insideZone = false;
 
             for (let quest of quests) {
-                const distance = getDistance(playerLat, playerLng, quest.latitude, quest.longitude);
+                const distance = getDistance(pLat, pLng, quest.latitude, quest.longitude);
 
                 if (distance <= ACTIVATION_RADIUS) {
                     insideZone = true;
                     activeQuest = quest;
-                    
-                    document.getElementById('quest-title').innerText = `📍 В игровой зоне: ${quest.title}`;
-                    document.getElementById('quest-desc').innerText = "Вы на точке! Нажмите кнопку, чтобы прочесть загадку.";
-                    document.getElementById('action-btn').disabled = false;
+                    document.getElementById('quest-title').innerText = `• ОБЪЕКТ РЯДОМ •`;
+                    document.getElementById('quest-desc').innerText = `Зона: ${quest.title}\nДистанция: ${Math.round(distance)}м.`;
+                    if (!isQuestOpened) document.getElementById('action-btn').disabled = false;
                     break;
                 }
             }
 
             if (!insideZone) {
                 activeQuest = null;
-                document.getElementById('quest-title').innerText = "🗺️ Исследуйте местность";
-                document.getElementById('quest-desc').innerText = "Ищите зеленые круги на карте Яндекс.";
+                document.getElementById('quest-title').innerText = `СКАНИРОВАНИЕ ЗОН`;
+                document.getElementById('quest-desc').innerText = `Двигайтесь к точкам на тактическом экране.`;
                 document.getElementById('action-btn').disabled = true;
-                document.getElementById('action-btn').innerText = "Открыть задание";
+                document.getElementById('action-btn').innerText = "Открыть терминал";
                 document.getElementById('answer-input').style.display = "none";
+                isQuestOpened = false;
             }
         }
 
+        function draw() {
+            // Очистка экрана
+            ctx.fillStyle = "#070b12";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+
+            // Рисуем сетку навигатора
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.1)";
+            ctx.lineWidth = 1;
+            const gridStep = 40;
+            for(let x = 0; x < canvas.width; x += gridStep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+            for(let y = 0; y < canvas.height; y += gridStep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+
+            // Рисуем круги радара вокруг игрока
+            ctx.strokeStyle = "rgba(0, 229, 255, 0.2)";
+            [100, 200, 300].forEach(r => {
+                ctx.beginPath(); ctx.arc(centerX, centerY, r, 0, Math.PI*2); ctx.stroke();
+            });
+
+            // Рисуем точки квестов из Supabase
+            quests.forEach(quest => {
+                // Переводим разницу координат в пиксели экрана относительно игрока
+                const qX = centerX + (quest.longitude - playerPos.lng) * scale;
+                const qY = centerY - (quest.latitude - playerPos.lat) * scale; // Минус, так как в Canvas Y идет вниз
+
+                // Зона квеста (Зеленый пульсирующий круг)
+                ctx.fillStyle = "rgba(0, 255, 102, 0.15)";
+                ctx.strokeStyle = "#00ff66";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(qX, qY, ACTIVATION_RADIUS * (scale/100000), 0, Math.PI*2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Подпись точки
+                ctx.fillStyle = "#00ff66";
+                ctx.font = "12px monospace";
+                ctx.fillText(quest.title, qX + 15, qY + 5);
+            });
+
+            // Рисуем игрока (Центр экрана)
+            ctx.fillStyle = "#00e5ff";
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "#00e5ff";
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 8, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0; // Сброс тени
+        }
+
+        // Логика терминала ответов
         document.getElementById('action-btn').addEventListener('click', () => {
             const btn = document.getElementById('action-btn');
             const input = document.getElementById('answer-input');
 
             if (!isQuestOpened && activeQuest) {
-                document.getElementById('quest-desc').innerText = `📜 ЗАГАДКА:\n${activeQuest.description}`;
+                document.getElementById('quest-desc').innerText = `ВХОДЯЩИЕ ДАННЫЕ:\n${activeQuest.description}`;
                 input.style.display = "block";
-                btn.innerText = "Проверить ответ";
+                btn.innerText = "ПОДТВЕРДИТЬ КОД";
                 isQuestOpened = true;
             } else if (isQuestOpened && activeQuest) {
                 const userAnswer = input.value.trim().toLowerCase();
                 const correctAnswer = String(activeQuest.answer).trim().toLowerCase();
                 
                 if (userAnswer === correctAnswer) { 
-                    alert("🎉 Правильный ответ!");
-                    document.getElementById('quest-title').innerText = "✅ Пройдено!";
-                    document.getElementById('quest-desc').innerText = "Отлично! Квест выполнен.";
+                    alert("ДОСТУП РАЗРЕШЕН! СЕКТОР ЗАЧИЩЕН.");
+                    document.getElementById('quest-title').innerText = "• ВЫПОЛНЕНО •";
+                    document.getElementById('quest-desc').innerText = "Код подошел. База данных обновлена.";
                     input.style.display = "none";
                     btn.disabled = true;
-                    btn.innerText = "Выполнено";
+                    btn.innerText = "СДЕЛАНO";
                 } else {
-                    alert("❌ Ответ неверный, попробуй еще раз!");
+                    alert("ОТКАЗ В ДОСТУПЕ: НЕВЕРНЫЙ КЛЮЧ ЧТЕНИЯ!");
                 }
             }
         });
