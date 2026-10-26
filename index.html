@@ -49,12 +49,12 @@
         // Инициализация карты (по умолчанию центр на Москву, пока нет GPS)
         map = L.map('map', { zoomControl: false }).setView([55.7558, 37.6173], 15);
         
-        // Подключаем бесплатные карты OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
+        L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap, © CartoDB',
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(map);
-
+        
         // Функция загрузки точек из Supabase
         async function loadQuests() {
             try {
