@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GPS Гео-Квест</title>
     <!-- Используем Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- ПЕРЕНЕСЛИ СЮДА: Теперь карта загрузится гарантированно вовремя -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
         #map { width: 100%; height: 100%; z-index: 1; background: #e5e3df; }
@@ -35,8 +37,6 @@
         <button id="action-btn" disabled>Открыть задание</button>
     </div>
 
-    <script src="https://unpkg.com"></script>
-    
     <script>
         // === НАСТРОЙКА SUPABASE (Замени на свои значения!) ===
         const SUPABASE_URL = "https://uitjtiujqfypylnjcqsr.supabase.co";
