@@ -107,7 +107,28 @@
         function onLocationSuccess(position) {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            updatePlayerMarker(lat, lng);
+        
+            // Если маркер игрока еще не создан — создаем стандартный синий маркер Leaflet
+            if (!playerMarker) {
+                playerMarker = L.marker([lat, lng]).addTo(map);
+        
+                playerRadius = L.circle([lat, lng], { 
+                    radius: ACTIVATION_RADIUS, 
+                    color: '#007bff', 
+                    fillOpacity: 0.15 
+                }).addTo(map);
+        
+                map.setView([lat, lng], 17); // Фокусируем карту на игроке
+                loadQuests(); // Карта готова — качаем точки из Supabase
+            } else {
+                // Обновляем позицию игрока
+                playerMarker.setLatLng([lat, lng]);
+                playerRadius.setLatLng([lat, lng]);
+            }
+        
+            if (!isQuestOpened) {
+                checkGameZones(lat, lng);
+            }
         }
 
         function onLocationError(error) {
