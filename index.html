@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GPS Гео-Квест</title>
     
-    <!-- ПОДКЛЮЧАЕМ ЛОКАЛЬНЫЕ ФАЙЛЫ ИЗ ТВОЕГО РЕПОЗИТОРИЯ -->
-    <link rel="stylesheet" href="leaflet.css" />
-    <script src="leaflet.js"></script>
+    <!-- ПОДКЛЮЧАЕМ СВЕРХНАДЕЖНЫЙ CDN ОТ ЯНДЕКСА -->
+    <link rel="stylesheet" href="https://yastatic.net" />
+    <link rel="stylesheet" href="https://cloudflare.com" />
+    <script src="https://cloudflare.com"></script>
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: sans-serif; overflow: hidden; }
@@ -33,7 +34,7 @@
 
     <div id="ui-panel">
         <h3 id="quest-title">Настройка карт...</h3>
-        <p id="quest-desc">Загружаем локальные слои карты и проверяем датчики.</p>
+        <p id="quest-desc">Загружаем слои карты и проверяем датчики.</p>
         <input type="text" id="answer-input" placeholder="Введите ваш ответ...">
         <button id="action-btn" disabled>Открыть задание</button>
     </div>
@@ -43,6 +44,7 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8";
 
         // === КООРДИНАТЫ ДЛЯ ТЕСТОВ ДОМА ===
+        // Замени эти цифры на координаты своего реального дома!
         const HOME_LAT = 55.7558; 
         const HOME_LNG = 37.6173;
 
@@ -53,10 +55,10 @@
         const ACTIVATION_RADIUS = 20; 
 
         window.onload = function() {
-            // Инициализируем карту
+            // Инициализируем карту через полную библиотеку Leaflet
             map = L.map('map', { zoomControl: false }).setView([HOME_LAT, HOME_LNG], 16);
             
-            // Сверхстабильный сервер Яндекс.Карт
+            // Загружаем подложку Яндекс.Карт
             L.tileLayer('https://yandex.net{x}&y={y}&z={z}&scale=1&lang=ru_RU', {
                 maxZoom: 18,
                 attribution: '© Яндекс.Карты'
@@ -108,8 +110,8 @@
         }
 
         function onLocationError(error) {
-            console.warn(`GPS недоступен. Переключаемся на симулятор...`);
-            activateSimulator(`Симулятор активен (Поиск спутников...)`);
+            console.warn("GPS недоступен. Переключаемся на симулятор...");
+            activateSimulator("Симулятор активен (Поиск спутников...)");
         }
 
         function activateSimulator(statusMessage) {
