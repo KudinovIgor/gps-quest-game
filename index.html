@@ -185,6 +185,7 @@ function initMap(){
   openedLayer=L.layerGroup().addTo(map);
   targetMark=L.marker([0,0],{icon:pulseIcon,interactive:false,opacity:0}).addTo(map);
   map.on('click',e=>{ if(S.testMode&&S.started){ setPos(e.latlng.lat,e.latlng.lng,5); toast('🧪 Телепорт: '+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)); } });
+  map.attributionControl.setPrefix(false);
 }
 function refreshMarkers(){
   const t=(S.phase==='main')?target():null;
@@ -361,13 +362,14 @@ async function loadQuests(){
   }
   const src=rows||DEMO;
   S.quests=src.map((r,i)=>({
-    id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+r.latitude,lng:+r.longitude,
+    id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
     desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
     order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
   })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
   if(rows&&S.quests.some(q=>q.kind==='main'&&!q.answer))toast('⚠️ В БД нет колонки answer — выполни SQL из инструкции, иначе загадки не проверить.',10000);
   if(note)toast(note,8000);
   updateGame();
+  if(!S.quests.length)toast('⚠️ Точек нет вообще: БД пуста, а список DEMO в файле пуст или с ошибкой в именах полей.',12000);
 }
 
 /* ---------- старт ---------- */
