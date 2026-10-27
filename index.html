@@ -57,6 +57,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #toast.show{opacity:1}
 .pulse{width:36px;height:36px;border-radius:50%;background:rgba(0,229,255,.35);border:2px solid var(--cy);animation:pul 1.6s infinite}
 @keyframes pul{0%{box-shadow:0 0 0 0 rgba(0,229,255,.5)}100%{box-shadow:0 0 0 22px rgba(0,229,255,0)}}
+.dbg{width:24px;height:24px;border-radius:50%;background:var(--warn);color:#20150a;font-weight:700;font-size:12px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.6)}
+.dbg.bonus{background:#c77dff;color:#1b0630}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -70,6 +72,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
    <button id="btnRadar">📡 Радар</button>
   </div>
   <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт">🧪 Тест</button>
+  <button id="btnDebug" class="chip" title="Отладка: номера точек и связи маршрута">🐞 Отладка</button>
   <button id="btnReset" class="chip" title="Сбросить прогресс">⟲</button>
  </header>
  <div id="geoStatus" class="wait">🛰 Геолокация ещё не запрошена.</div>
@@ -158,7 +161,7 @@ const DEMO = [
 ];
 
 const $ = id => document.getElementById(id);
-const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null};
+const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false};
 const LS = 'gq_progress_v1';
 function saveProg(){ localStorage.setItem(LS, JSON.stringify([...S.opened])); }
 function loadProg(){ try{ (JSON.parse(localStorage.getItem(LS)||'[]')).forEach(x=>S.opened.add(String(x))); }catch(e){} }
@@ -177,7 +180,7 @@ const target=()=>mains().find(q=>!S.opened.has(String(q.id)));
 const mainsDone=()=>mains().length>0&&mains().every(q=>S.opened.has(String(q.id)));
 
 /* ---------- карта (Leaflet + OpenStreetMap, БЕЗ ключей) ---------- */
-let map,userMark,accCircle,targetMark,openedLayer;
+let map,userMark,accCircle,targetMark,openedLayer,debugLayer=null;
 const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[36,36],iconAnchor:[18,18]});
 function initMap(){
   map=L.map('map',{zoomControl:true}).setView(CONFIG.cityCenter,13);
@@ -198,6 +201,32 @@ function refreshMarkers(){
   });
 }
 
+/* ---------- отладка: весь маршрут с номерами и связями ---------- */
+function renderDebug(){
+  if(debugLayer){map.removeLayer(debugLayer);debugLayer=null;}
+  if(!S.debug)return;
+  debugLayer=L.layerGroup().addTo(map);
+  const ms=mains(),bs=bonuses();
+  if(ms.length>1)L.polyline(ms.map(q=>[q.lat,q.lng]),{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
+  ms.forEach((q,i)=>{
+    L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg">'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500})
+      .bindTooltip((i+1)+'. '+q.title+' | sort_order='+q.order+' | id='+q.id,{direction:'top',offset:[0,-10]})
+      .addTo(debugLayer);
+  });
+  bs.forEach((q,i)=>{
+    L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg bonus">Б'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500})
+      .bindTooltip('Б'+(i+1)+'. '+q.title+' | sort_order='+q.order+' | id='+q.id,{direction:'top',offset:[0,-10]})
+      .addTo(debugLayer);
+  });
+  const all=S.quests.map(q=>[q.lat,q.lng]);
+  if(all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
+}
+function toggleDebug(){
+  S.debug=!S.debug;
+  $('btnDebug').classList.toggle('on',S.debug);
+  renderDebug();
+  toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
+}
 /* ---------- геолокация с честными ошибками ---------- */
 function geoStatus(cls,txt){const el=$('geoStatus');el.className=cls;el.textContent=txt;}
 function setPos(lat,lng,acc){
@@ -391,6 +420,7 @@ async function loadQuests(){
   if(rows&&S.quests.some(q=>q.kind==='main'&&!q.answer))toast('⚠️ В БД нет колонки answer — выполни SQL из инструкции, иначе загадки не проверить.',10000);
   if(note)toast(note,8000);
   updateGame();
+  renderDebug();
   if(!S.quests.length)toast('⚠️ Точек нет вообще: БД пуста, а список DEMO в файле пуст или с ошибкой в именах полей.',12000);
 }
 
@@ -399,6 +429,7 @@ loadProg();initMap();
 $('btnMap').onclick=()=>setMode('map');
 $('btnRadar').onclick=()=>setMode('radar');
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
+$('btnDebug').onclick=toggleDebug;
 $('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;updateGame();toast('Прогресс сброшен.');};
 $('btnStart').onclick=()=>{$('ovStart').hidden=true;S.started=true;startGeo();};
 $('btnBonusStart').onclick=startBonus;
