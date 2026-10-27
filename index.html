@@ -1,214 +1,391 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Трекер: Квест</title>
-    <style>
-        body, html { margin: 0; padding: 0; height: 100%; font-family: monospace; background: #070b12; color: #00e5ff; overflow: hidden; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-        canvas { width: 100%; height: 100%; display: block; }
-        #ui-panel {
-            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 10; width: 90%; max-width: 400px; background: rgba(10, 20, 38, 0.9);
-            border: 2px solid #00e5ff; padding: 15px; border-radius: 12px; 
-            box-shadow: 0 0 20px rgba(0,229,255,0.3); text-align: center; box-sizing: border-box;
-        }
-        button { background: #00e5ff; color: #070b12; border: none; padding: 12px 20px; 
-                 border-radius: 6px; font-size: 16px; cursor: pointer; font-weight: bold; width: 100%; font-family: inherit; text-transform: uppercase; }
-        button:disabled { background: #102a36; color: #005b66; cursor: not-allowed; }
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #00e5ff; 
-                background: #070b12; color: #00e5ff; border-radius: 6px; box-sizing: border-box; font-size: 16px; display: none; text-align: center; font-family: inherit; }
-        h3 { margin: 0 0 8px 0; letter-spacing: 1px; }
-        p { margin: 0 0 12px 0; color: #8ab4f8; font-size: 13px; line-height: 1.3; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GPS Квест: Рязань</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#070b12;--panel:#0d1626;--cy:#00e5ff;--gr:#00ff66;--warn:#ffc857;--err:#ff5470;--txt:#cfefff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--txt)}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel);border-bottom:1px solid #16324a;flex-wrap:wrap;z-index:1000}
+.ttl{font-weight:700;color:var(--cy);letter-spacing:1px;margin-right:auto}
+.chip{background:#102a3c;border:1px solid #1d4a63;color:var(--txt);border-radius:20px;padding:4px 10px;font-size:12px;cursor:pointer}
+.chip.on{background:var(--cy);color:#032}
+.seg{display:flex;border:1px solid #1d4a63;border-radius:20px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--txt);padding:6px 12px;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--cy);color:#032;font-weight:700}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+#geoStatus{padding:4px 10px;font-size:12px;background:#0a1a2a;border-bottom:1px solid #16324a}
+#geoStatus.ok{color:var(--gr)}#geoStatus.wait{color:var(--warn)}#geoStatus.err{color:var(--err)}
+#views{position:relative;flex:1;min-height:0}
+#map{position:absolute;inset:0}
+#radarView{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;overflow:auto;background:radial-gradient(circle at 50% 40%,#0a1a2a 0%,#070b12 70%)}
+#radar{width:min(92vw,420px);aspect-ratio:1/1;max-height:52vh}
+#radarList{list-style:none;margin:0;padding:0 0 150px;width:min(92vw,460px);font-size:14px}
+#radarList li{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid #16324a;border-radius:8px;margin-top:6px;background:#0d1626}
+#radarList b{color:var(--gr);white-space:nowrap}
+#card{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:1200;width:min(94vw,460px);background:rgba(13,22,38,.95);border:1px solid var(--cy);border-radius:14px;padding:12px 14px;box-shadow:0 0 24px rgba(0,229,255,.25);max-height:46vh;overflow:auto}
+#card h3{margin:0 0 6px;color:var(--cy);font-size:16px}
+#card .desc{font-size:13px;line-height:1.45;color:#9fc6e8;margin-bottom:8px;white-space:pre-line}
+#card .dist{font-size:13px;color:var(--gr);margin-bottom:8px}
+#answerRow{display:flex;gap:8px}
+#answerInput{flex:1;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:10px;font-size:15px}
+#answerInput:disabled{opacity:.5}
+#answerBtn{background:var(--cy);border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer}
+#answerBtn:disabled{background:#10344a;color:#4a7a93;cursor:not-allowed}
+#btnBonusGo{width:100%;margin-top:4px;background:var(--cy);border:0;border-radius:8px;padding:10px;font-weight:700;cursor:pointer}
+.hint{font-size:12px;color:var(--warn);margin-top:6px}
+.timer{font-size:26px;font-weight:800;color:var(--warn);text-align:center}
+.timer.danger{color:var(--err);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.4}}
+#frags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.frag{border:1px dashed var(--gr);color:var(--gr);border-radius:8px;padding:3px 8px;font-size:12px}
+.frag.lock{border-color:#33506a;color:#5b7d99}
+.overlay{position:fixed;inset:0;background:rgba(3,8,14,.82);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px}
+.box{background:var(--panel);border:1px solid var(--cy);border-radius:16px;padding:20px;max-width:440px;width:100%;text-align:center;box-shadow:0 0 40px rgba(0,229,255,.3)}
+.box h2{color:var(--cy);margin:0 0 10px}
+.box p{font-size:14px;line-height:1.5;color:#9fc6e8}
+.box button{margin-top:12px;width:100%;background:var(--cy);border:0;border-radius:10px;padding:12px;font-size:16px;font-weight:700;cursor:pointer}
+.box button.sec{background:transparent;border:1px solid #1d4a63;color:var(--txt);margin-top:8px}
+.key{font-size:22px;letter-spacing:2px;color:var(--gr);border:1px dashed var(--gr);border-radius:10px;padding:10px;margin:10px 0;word-break:break-all}
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:3000;background:#0d1626;border:1px solid var(--gr);color:var(--txt);padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .3s;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+.pulse{width:36px;height:36px;border-radius:50%;background:rgba(0,229,255,.35);border:2px solid var(--cy);animation:pul 1.6s infinite}
+@keyframes pul{0%{box-shadow:0 0 0 0 rgba(0,229,255,.5)}100%{box-shadow:0 0 0 22px rgba(0,229,255,0)}}
+[hidden]{display:none!important}
+</style>
 </head>
 <body>
+<div id="app">
+ <header>
+  <div class="ttl">🧭 GPS QUEST</div>
+  <div id="progress" class="chip" style="cursor:default">🚩 0/0</div>
+  <div class="seg">
+   <button id="btnMap" class="on">🗺 Карта</button>
+   <button id="btnRadar">📡 Радар</button>
+  </div>
+  <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт">🧪 Тест</button>
+  <button id="btnReset" class="chip" title="Сбросить прогресс">⟲</button>
+ </header>
+ <div id="geoStatus" class="wait">🛰 Геолокация ещё не запрошена.</div>
+ <div id="views">
+  <div id="map"></div>
+  <div id="radarView" hidden>
+   <canvas id="radar"></canvas>
+   <ul id="radarList"></ul>
+  </div>
+  <div id="card">
+   <h3 id="cardTitle">Загрузка...</h3>
+   <div class="desc" id="cardDesc"></div>
+   <div class="dist" id="cardDist"></div>
+   <div id="bonusInfo" hidden>
+    <div id="bonusTimer" class="timer">10:00</div>
+    <div id="frags"></div>
+   </div>
+   <div id="answerRow">
+    <input id="answerInput" placeholder="Ответ..." autocomplete="off">
+    <button id="answerBtn">Ответить</button>
+   </div>
+   <button id="btnBonusGo" hidden>⏱ Начать бонус-рейд</button>
+   <div id="hintLine" class="hint" hidden></div>
+  </div>
+ </div>
+</div>
 
-    <div id="canvas-container">
-        <canvas id="gameCanvas"></canvas>
-    </div>
+<div id="ovStart" class="overlay"><div class="box">
+ <h2>🧭 GPS Квест: Рязань</h2>
+ <p>Ходи по городу и находи точки: переключайся между <b>картой</b> и <b>радаром</b>. У точки откроется загадка — ответишь верно, появится следующая.<br><br>Откроешь все основные точки — разблокируется <b>бонус-рейд</b>: 10 минут, только радар, собери фрагменты ключа.<br><br><i>Геолокация работает по HTTPS или localhost (GitHub Pages подходит). Для проверки дома включи 🧪 Тест.</i></p>
+ <button id="btnStart">🛰 Начать игру</button>
+</div></div>
 
-    <div id="ui-panel">
-        <h3 id="quest-title">СИНХРОНИЗАЦИЯ...</h3>
-        <p id="quest-desc">Подключение к спутникам позиционирования.</p>
-        <input type="text" id="answer-input" placeholder="ВВЕДИТЕ ОТВЕТ...">
-        <button id="action-btn" disabled>Открыть терминал</button>
-    </div>
+<div id="ovBonus" class="overlay" hidden><div class="box">
+ <h2>🏆 Все точки открыты!</h2>
+ <p>Открыт бонус-рейд: <b>скрытые точки</b>, видно только на радаре, <b>10 минут</b>. Подойди к каждой — соберёшь фрагменты ключа.</p>
+ <button id="btnBonusStart">⏱ Начать рейд (10:00)</button>
+ <button id="btnBonusLater" class="sec">Позже</button>
+</div></div>
 
-    <script>
-        // === ВНИМАНИЕ: ВСТАВЬ СЮДА СВОИ ДАННЫЕ ВМЕСТО ШАБЛОННЫХ ===
-        const SUPABASE_URL = "https://uitjtiujqfypylnjcqsr.supabase.co";
-        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8";
+<div id="ovWin" class="overlay" hidden><div class="box">
+ <h2>🔑 Ключ собран!</h2>
+ <p>Ты успел по времени. Ты — легенда Рязани!</p>
+ <div class="key" id="winKey"></div>
+ <p>Покажи этот код хранителю квеста.</p>
+ <button id="btnWinClose">Продолжить</button>
+</div></div>
 
-        // === ТВОИ ДОМАШНИЕ КООРДИНАТЫ ДЛЯ ТЕСТА ===
-        const HOME_LAT = 55.7558; 
-        const HOME_LNG = 37.6173;
+<div id="ovFail" class="overlay" hidden><div class="box">
+ <h2>⏰ Время вышло!</h2>
+ <p>Ключ растворился в эфире... Собранные фрагменты остались с тобой. Попробуй ещё раз!</p>
+ <button id="btnFailRetry">🔄 Повторить рейд (10:00)</button>
+</div></div>
 
-        let canvas, ctx;
-        let quests = [];
-        let activeQuest = null;
-        let isQuestOpened = false;
-        const ACTIVATION_RADIUS = 20; 
-        
-        let playerPos = { lat: HOME_LAT, lng: HOME_LNG };
-        let scale = 150000; // Увеличили масштаб для лучшей видимости точек
+<div id="toast"></div>
 
-        window.onload = function() {
-            canvas = document.getElementById('gameCanvas');
-            ctx = canvas.getContext('2d');
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
+<script>
+'use strict';
+/* ============ НАСТРОЙКИ ============
+   anon-ключ публиковать МОЖНО (он публичный по дизайну), но включи RLS (SQL выше).
+   service_role ключ вставлять сюда НЕЛЬЗЯ никогда. */
+const CONFIG = {
+  supabaseUrl: 'https://uitjtiujqfypylnjcqsr.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8',
+  arriveRadius: 40,      // метров до точки по умолчанию
+  bonusSeconds: 600,     // 10 минут на бонус-рейд
+  cityCenter: [54.6269, 39.7408]
+};
 
-            loadQuests();
+/* Демо-точки: используются, пока Supabase не подключен/пуст. Замени своими в БД. */
+const DEMO = [
+ {id:'d1',order:10,kind:'main',title:'Памятник Скобелеву',lat:54.608688,lng:39.812258,desc:'ДЕМО-загадка: сколько букв «Е» в слове «СКОБЕЛЕВ» на постаменте?',answer:'2',hint:'С-К-О-Б-Е-Л-Е-В'},
+ {id:'d2',order:20,kind:'main',title:'Рязанский кремль',lat:54.6347,lng:39.7544,desc:'ДЕМО: на какой реке стоит Рязань?',answer:'ока',hint:'Не Волга'},
+ {id:'d3',order:30,kind:'main',title:'Улица Почтовая',lat:54.6262,lng:39.7408,desc:'ДЕМО: сколько месяцев в году?',answer:'12',hint:'Больше десяти'},
+ {id:'d4',order:40,kind:'main',title:'Площадь Победы',lat:54.6172,lng:39.7283,desc:'ДЕМО: сколько ног у паука?',answer:'8',hint:'Не шесть'},
+ {id:'d5',order:50,kind:'main',title:'Городской парк',lat:54.6229,lng:39.7501,desc:'ДЕМО: сколько цветов в радуге?',answer:'7',hint:'Каждый охотник...'},
+ {id:'d6',order:60,kind:'main',title:'Речной порт',lat:54.6402,lng:39.7689,desc:'ДЕМО: сколько колёс у автомобиля?',answer:'4',hint:'Запаску не считаем'},
+ {id:'d7',order:70,kind:'main',title:'Центральный парк',lat:54.6109,lng:39.7356,desc:'ДЕМО: сколько хвостов у трёх котов?',answer:'3',hint:'Столько же, сколько котов'},
+ {id:'d8',order:80,kind:'main',title:'Театральная площадь',lat:54.6269,lng:39.7441,desc:'ДЕМО: сколько пальцев на одной руке?',answer:'5',hint:'Вместе с большим'},
+ {id:'d9',order:90,kind:'main',title:'Вокзал Рязань-1',lat:54.6397,lng:39.7282,desc:'ДЕМО: сколько килограммов в тонне?',answer:'1000',hint:'Три нуля'},
+ {id:'d10',order:100,kind:'main',title:'Набережная Оки',lat:54.6310,lng:39.7620,desc:'ДЕМО: сколько жизней у кошки по легенде?',answer:'9',hint:'Одна цифра'},
+ {id:'b1',order:200,kind:'bonus',title:'Бонус-точка «Альфа»',lat:54.6200,lng:39.7450,desc:'Фрагмент 1',answer:'RYAZAN'},
+ {id:'b2',order:210,kind:'bonus',title:'Бонус-точка «Бета»',lat:54.6290,lng:39.7350,desc:'Фрагмент 2',answer:'SKOBELEV'},
+ {id:'b3',order:220,kind:'bonus',title:'Бонус-точка «Гамма»',lat:54.6150,lng:39.7500,desc:'Фрагмент 3',answer:'2026'}
+];
 
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(
-                    (pos) => { playerPos.lat = pos.coords.latitude; playerPos.lng = pos.coords.longitude; updateGame(); },
-                    () => { updateGame(); }, 
-                    { enableHighAccuracy: true, maximumAge: 1000 }
-                );
-            } else {
-                updateGame();
-            }
-        };
+const $ = id => document.getElementById(id);
+const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false};
+const LS = 'gq_progress_v1';
+function saveProg(){ localStorage.setItem(LS, JSON.stringify([...S.opened])); }
+function loadProg(){ try{ (JSON.parse(localStorage.getItem(LS)||'[]')).forEach(x=>S.opened.add(String(x))); }catch(e){} }
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            draw();
-        }
+/* ---------- гео-математика ---------- */
+function distM(lat1,lng1,lat2,lng2){const R=6371000,r=Math.PI/180,dLa=(lat2-lat1)*r,dLo=(lng2-lng1)*r;const a=Math.sin(dLa/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(a));}
+function bearing(lat1,lng1,lat2,lng2){const r=Math.PI/180,la1=lat1*r,la2=lat2*r,dl=(lng2-lng1)*r;const y=Math.sin(dl)*Math.cos(la2),x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dl);return (Math.atan2(y,x)/r+360)%360;}
+const DIRS=['С','СВ','В','ЮВ','Ю','ЮЗ','З','СЗ'];
+const dirName=d=>DIRS[Math.round(d/45)%8];
+const fmtDist=m=>m<1000?Math.round(m)+' м':(m/1000).toFixed(1)+' км';
+const normAns=s=>(s||'').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 
-        async function loadQuests() {
-            try {
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/quests?select=*`, {
-                    headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` }
-                });
-                if (!response.ok) throw new Error("Сбой сети или ключей");
-                quests = await response.json();
-                updateGame();
-            } catch (err) {
-                console.error(err);
-                document.getElementById('quest-desc').innerText = "ОШИБКА БАЗЫ ДАННЫХ.\nПроверьте API-ключи в коде.";
-            }
-        }
+const mains=()=>S.quests.filter(q=>q.kind!=='bonus');
+const bonuses=()=>S.quests.filter(q=>q.kind==='bonus');
+const target=()=>mains().find(q=>!S.opened.has(String(q.id)));
+const mainsDone=()=>mains().length>0&&mains().every(q=>S.opened.has(String(q.id)));
 
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; 
-            const phi1 = lat1 * Math.PI / 180;
-            const phi2 = lat2 * Math.PI / 180;
-            const deltaPhi = (lat2 - lat1) * Math.PI / 180;
-            const deltaLambda = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
-                      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
+/* ---------- карта (Leaflet + OpenStreetMap, БЕЗ ключей) ---------- */
+let map,userMark,accCircle,targetMark,openedLayer;
+const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[36,36],iconAnchor:[18,18]});
+function initMap(){
+  map=L.map('map',{zoomControl:true}).setView(CONFIG.cityCenter,13);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  accCircle=L.circle([0,0],{radius:10,color:'#4fc3f7',weight:1,fillOpacity:.08,interactive:false}).addTo(map);
+  userMark=L.circleMarker([0,0],{radius:7,color:'#fff',weight:2,fillColor:'#4fc3f7',fillOpacity:0,opacity:0}).addTo(map);
+  openedLayer=L.layerGroup().addTo(map);
+  targetMark=L.marker([0,0],{icon:pulseIcon,interactive:false,opacity:0}).addTo(map);
+  map.on('click',e=>{ if(S.testMode&&S.started){ setPos(e.latlng.lat,e.latlng.lng,5); toast('🧪 Телепорт: '+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)); } });
+}
+function refreshMarkers(){
+  const t=(S.phase==='main')?target():null;
+  if(t){ targetMark.setLatLng([t.lat,t.lng]); targetMark.setOpacity(1); } else targetMark.setOpacity(0);
+  openedLayer.clearLayers();
+  S.quests.filter(q=>S.opened.has(String(q.id))).forEach(q=>{
+    L.circleMarker([q.lat,q.lng],{radius:6,color:'#7a8ba3',weight:1,fillColor:'#33506a',fillOpacity:1}).bindTooltip(q.title).addTo(openedLayer);
+  });
+}
 
-        function updateGame() {
-            checkGameZones(playerPos.lat, playerPos.lng);
-            draw();
-        }
+/* ---------- геолокация с честными ошибками ---------- */
+function geoStatus(cls,txt){const el=$('geoStatus');el.className=cls;el.textContent=txt;}
+function setPos(lat,lng,acc){
+  S.pos=[lat,lng];S.acc=acc||50;
+  geoStatus('ok','🛰 GPS: точность ±'+Math.round(S.acc)+' м'+(S.testMode?' (тест)':''));
+  userMark.setLatLng(S.pos);userMark.setStyle({fillOpacity:1,opacity:1});
+  accCircle.setLatLng(S.pos);accCircle.setRadius(S.acc);
+  if(!S.centered){map.setView(S.pos,16);S.centered=true;}
+  updateGame();
+}
+function startGeo(){
+  if(S.watchId!==null)return;
+  if(!('geolocation' in navigator)){geoStatus('err','⚠️ Браузер не даёт геолокацию: нужен HTTPS или localhost! Включи 🧪 Тест.');return;}
+  geoStatus('wait','🛰 Ищем спутники... На улице или у окна фиксация быстрее.');
+  S.watchId=navigator.geolocation.watchPosition(
+    p=>setPos(p.coords.latitude,p.coords.longitude,p.coords.accuracy||50),
+    e=>{const m={1:'Доступ к геолокации запрещён. Разреши в настройках сайта или включи 🧪.',2:'Сигнал GPS недоступен (помещение?). Пробуем снова...',3:'GPS долго отвечает. Пробуем снова (Wi-Fi/вышки)...'}[e.code]||e.message;geoStatus('err','⚠️ '+m);},
+    {enableHighAccuracy:true,maximumAge:5000,timeout:30000});
+}
 
-        function checkGameZones(pLat, pLng) {
-            if(quests.length === 0) return;
-            let insideZone = false;
+/* ---------- игровая логика ---------- */
+function updateGame(){
+  const ms=mains(),bs=bonuses();
+  const om=ms.filter(q=>S.opened.has(String(q.id))).length;
+  $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'');
+  if(S.phase==='bonus'&&S.pos){
+    for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
+      if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
+        S.opened.add(String(q.id));saveProg();toast('🔑 Фрагмент собран: '+q.answer);
+        if(bs.length&&bs.every(b=>S.opened.has(String(b.id))))win();
+      }
+    }
+  }
+  const rel=(S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id)));
+  S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
+  S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
+  renderRadarList();renderCard();refreshMarkers();
+}
+function renderRadarList(){
+  const ul=$('radarList');
+  if(!S.pos){ul.innerHTML='<li>🛰 Ждём координаты... (дома включи 🧪 и кликни по карте)</li>';return;}
+  if(!S.blips.length){ul.innerHTML='<li>Активных точек нет</li>';return;}
+  ul.innerHTML=S.blips.slice(0,6).map(b=>'<li><span>'+b.t+'</span><b>'+fmtDist(b.d)+' · '+dirName(b.b)+'</b></li>').join('');
+}
+function renderFrags(){
+  $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?q.answer:'???')+'</span>';}).join('');
+}
+function renderCard(){
+  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo');
+  if(S.phase==='won'){$('card').hidden=true;return;}
+  $('card').hidden=false;
+  if(S.phase==='bonus'){
+    $('cardTitle').textContent='🔑 Бонус-рейд: собери фрагменты!';
+    $('cardDesc').textContent='На радаре — скрытые точки. Подойди к каждой вплотную, фрагмент добавится сам.';
+    $('cardDist').textContent='Осталось точек: '+bonuses().filter(q=>!S.opened.has(String(q.id))).length;
+    bi.hidden=false;ar.hidden=true;hl.hidden=true;bg.hidden=true;renderFrags();return;
+  }
+  bi.hidden=true;
+  const t=target();
+  if(!t){
+    $('cardTitle').textContent='🎉 Все основные точки открыты!';
+    $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
+    $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
+  }
+  bg.hidden=true;ar.hidden=false;
+  $('cardTitle').textContent='🎯 '+t.title;
+  $('cardDesc').textContent=t.desc||'';
+  let dTxt;
+  if(S.pos){
+    const d=distM(S.pos[0],S.pos[1],t.lat,t.lng);
+    S.atPoint=d<=t.radius;
+    dTxt=S.atPoint?'✅ Ты на точке! Отвечай на загадку.':'📏 До точки: '+fmtDist(d)+' ('+dirName(bearing(S.pos[0],S.pos[1],t.lat,t.lng))+')';
+  } else {S.atPoint=false;dTxt='🛰 Ждём координаты...';}
+  $('cardDist').textContent=dTxt;
+  $('answerInput').disabled=!S.atPoint;$('answerBtn').disabled=!S.atPoint;
+  const w=S.wrong[t.id]||0;
+  if(w>=2&&t.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+t.hint;}else hl.hidden=true;
+}
+function submitAnswer(){
+  const t=target();if(!t||!S.atPoint)return;
+  const v=normAns($('answerInput').value);if(!v)return;
+  const ok=String(t.answer).split('|').some(a=>normAns(a)===v);
+  if(ok){
+    S.opened.add(String(t.id));saveProg();S.wrong[t.id]=0;$('answerInput').value='';
+    toast('✅ Точка «'+t.title+'» открыта!');
+    if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;
+    updateGame();
+  } else {
+    S.wrong[t.id]=(S.wrong[t.id]||0)+1;
+    toast('❌ Неверно! Попытка '+S.wrong[t.id]);renderCard();
+  }
+}
+function tick(){
+  if(S.phase!=='bonus')return;
+  const left=S.bonusEndsAt-Date.now(),el=$('bonusTimer');
+  if(left<=0){el.textContent='00:00';fail();return;}
+  const s=Math.floor(left/1000);
+  el.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+  el.classList.toggle('danger',left<60000);
+}
+function startBonus(){
+  S.phase='bonus';S.lockRadar=true;$('btnMap').disabled=true;setMode('radar');
+  S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
+  clearInterval(S.timerId);S.timerId=setInterval(tick,250);tick();
+  $('ovBonus').hidden=true;$('ovFail').hidden=true;
+  updateGame();toast('⏱ Рейд начался! У тебя 10 минут.');
+}
+function win(){
+  S.phase='won';clearInterval(S.timerId);S.lockRadar=false;
+  $('winKey').textContent=bonuses().map(q=>q.answer).join('-');
+  $('ovWin').hidden=false;updateGame();
+}
+function fail(){clearInterval(S.timerId);$('ovFail').hidden=false;}
 
-            for (let quest of quests) {
-                const distance = getDistance(pLat, pLng, quest.latitude, quest.longitude);
+/* ---------- радар (canvas) ---------- */
+const cv=$('radar');
+function drawRadar(ts){
+  const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  if(!w||!h)return;
+  if(cv.width!==Math.round(w*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}
+  const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
+  const cx=w/2,cy=h/2,R=Math.min(w,h)/2-6;
+  c.strokeStyle='rgba(0,229,255,.25)';c.fillStyle='rgba(0,229,255,.55)';c.font='10px monospace';
+  for(let i=1;i<=3;i++){c.beginPath();c.arc(cx,cy,R*i/3,0,7);c.stroke();c.fillText(fmtDist(S.maxRange*i/3),cx+4,cy-R*i/3+11);}
+  const sa=(ts/2600)%(Math.PI*2);
+  for(let i=0;i<24;i++){const a=sa-i*0.02;c.strokeStyle='rgba(0,255,102,'+(0.25*(1-i/24)).toFixed(3)+')';c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+R*Math.sin(a),cy-R*Math.cos(a));c.stroke();}
+  for(const b of S.blips){
+    const r=b.d/S.maxRange*R;if(r>R)continue;
+    const br=b.b*Math.PI/180,x=cx+r*Math.sin(br),y=cy-r*Math.cos(br);
+    let df=Math.abs(sa-br)%(Math.PI*2);df=Math.min(df,Math.PI*2-df);
+    const glow=Math.exp(-df*df/0.15);
+    c.fillStyle='rgba(0,255,102,'+(0.35+0.65*glow).toFixed(2)+')';
+    c.beginPath();c.arc(x,y,5+3*glow,0,7);c.fill();
+  }
+  c.fillStyle='#4fc3f7';c.beginPath();c.arc(cx,cy,5,0,7);c.fill();
+  if(!S.pos){c.fillStyle='rgba(255,200,87,.9)';c.font='13px monospace';c.textAlign='center';c.fillText('Поиск спутников...',cx,cy-14);c.fillText('(или включи 🧪 и кликни по карте)',cx,cy+26);c.textAlign='left';}
+}
+function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(loop);}
 
-                if (distance <= ACTIVATION_RADIUS) {
-                    insideZone = true;
-                    activeQuest = quest;
-                    document.getElementById('quest-title').innerText = `• ОБЪЕКТ РЯДОМ •`;
-                    document.getElementById('quest-desc').innerText = `Зона: ${quest.title}\nДистанция: ${Math.round(distance)}м.`;
-                    if (!isQuestOpened) document.getElementById('action-btn').disabled = false;
-                    break;
-                }
-            }
+/* ---------- режимы, UI ---------- */
+function setMode(m){
+  if(m==='map'&&S.lockRadar){toast('🔒 Карта отключена во время бонус-рейда.');return;}
+  S.mode=m;
+  $('btnMap').classList.toggle('on',m==='map');$('btnRadar').classList.toggle('on',m==='radar');
+  $('map').hidden=m!=='map';$('radarView').hidden=m!=='radar';
+  if(m==='map')setTimeout(()=>map.invalidateSize(),60);
+}
+let toastT;
+function toast(msg,ms=3500){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),ms);}
 
-            if (!insideZone) {
-                activeQuest = null;
-                document.getElementById('quest-title').innerText = `СКАНИРОВАНИЕ ЗОН`;
-                document.getElementById('quest-desc').innerText = `Двигайтесь к точкам на тактическом экране.`;
-                document.getElementById('action-btn').disabled = true;
-                document.getElementById('action-btn').innerText = "Открыть терминал";
-                document.getElementById('answer-input').style.display = "none";
-                isQuestOpened = false;
-            }
-        }
+/* ---------- загрузка квестов из Supabase (fallback: демо) ---------- */
+async function loadQuests(){
+  let rows=null,note='';
+  const url=CONFIG.supabaseUrl,key=CONFIG.supabaseAnonKey;
+  if(!url||!key||url.includes('YOUR-PROJECT'))note='Supabase не настроена — загружены демо-точки.';
+  else{
+    try{
+      const r=await fetch(url+'/rest/v1/quests?select=*&order=id.asc',{headers:{apikey:key,Authorization:'Bearer '+key}});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const data=await r.json();
+      rows=(data||[]).filter(x=>x.latitude!=null&&x.longitude!=null);
+      if(!rows.length){note='Supabase: таблица пуста или закрыта RLS. Загружены демо-точки.';rows=null;}
+    }catch(e){note='Supabase недоступна ('+e.message+'). Загружены демо-точки.';}
+  }
+  const src=rows||DEMO;
+  S.quests=src.map((r,i)=>({
+    id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+r.latitude,lng:+r.longitude,
+    desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
+    order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
+  })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
+  if(rows&&S.quests.some(q=>q.kind==='main'&&!q.answer))toast('⚠️ В БД нет колонки answer — выполни SQL из инструкции, иначе загадки не проверить.',10000);
+  if(note)toast(note,8000);
+  updateGame();
+}
 
-        function draw() {
-            if (!ctx) return;
-            
-            ctx.fillStyle = "#070b12";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-
-            // Сетка
-            ctx.strokeStyle = "rgba(0, 229, 255, 0.05)";
-            ctx.lineWidth = 1;
-            const gridStep = 40;
-            for(let x = 0; x < canvas.width; x += gridStep) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
-            for(let y = 0; y < canvas.height; y += gridStep) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-
-            // Исправленные круги радара
-            ctx.strokeStyle = "rgba(0, 229, 255, 0.15)";
-            [50, 100, 150, 200].forEach(r => {
-                ctx.beginPath(); ctx.arc(centerX, centerY, r, 0, Math.PI*2); ctx.stroke();
-            });
-
-            // Отображение точек
-            quests.forEach(quest => {
-                const qX = centerX + (quest.longitude - playerPos.lng) * scale;
-                const qY = centerY - (quest.latitude - playerPos.lat) * scale;
-
-                ctx.fillStyle = "rgba(0, 255, 102, 0.15)";
-                ctx.strokeStyle = "#00ff66";
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.arc(qX, qY, 15, 0, Math.PI*2);
-                ctx.fill();
-                ctx.stroke();
-
-                ctx.fillStyle = "#00ff66";
-                ctx.font = "10px monospace";
-                ctx.fillText(quest.title, qX + 20, qY + 4);
-            });
-
-            // Маркер игрока
-            ctx.fillStyle = "#00e5ff";
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 6, 0, Math.PI*2);
-            ctx.fill();
-        }
-
-        document.getElementById('action-btn').addEventListener('click', () => {
-            const btn = document.getElementById('action-btn');
-            const input = document.getElementById('answer-input');
-
-            if (!isQuestOpened && activeQuest) {
-                document.getElementById('quest-desc').innerText = `ВХОДЯЩИЕ ДАННЫЕ:\n${activeQuest.description}`;
-                input.style.display = "block";
-                btn.innerText = "ПОДТВЕРДИТЬ КОД";
-                isQuestOpened = true;
-            } else if (isQuestOpened && activeQuest) {
-                const userAnswer = input.value.trim().toLowerCase();
-                const correctAnswer = String(activeQuest.answer).trim().toLowerCase();
-                
-                if (userAnswer === correctAnswer) { 
-                    alert("ДОСТУП РАЗРЕШЕН!");
-                    document.getElementById('quest-title').innerText = "• ВЫПОЛНЕНО •";
-                    document.getElementById('quest-desc').innerText = "Сектор зачищен успешно.";
-                    input.style.display = "none";
-                    btn.disabled = true;
-                    btn.innerText = "СДЕЛАНO";
-                } else {
-                    alert("НЕВЕРНЫЙ КОД ДОСТУПА!");
-                }
-            }
-        });
-    </script>
+/* ---------- старт ---------- */
+loadProg();initMap();
+$('btnMap').onclick=()=>setMode('map');
+$('btnRadar').onclick=()=>setMode('radar');
+$('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
+$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;updateGame();toast('Прогресс сброшен.');};
+$('btnStart').onclick=()=>{$('ovStart').hidden=true;S.started=true;startGeo();};
+$('btnBonusStart').onclick=startBonus;
+$('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
+$('btnBonusGo').onclick=startBonus;
+$('btnFailRetry').onclick=startBonus;
+$('btnWinClose').onclick=()=>$('ovWin').hidden=true;
+$('answerBtn').onclick=submitAnswer;
+$('answerInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitAnswer();});
+loadQuests();
+requestAnimationFrame(loop);
+</script>
 </body>
 </html>
