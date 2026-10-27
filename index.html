@@ -23,6 +23,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #geoStatus.ok{color:var(--gr)}#geoStatus.wait{color:var(--warn)}#geoStatus.err{color:var(--err)}
 #views{position:relative;flex:1;min-height:0}
 #map{position:absolute;inset:0}
+.leaflet-control-attribution{font-size:9px;opacity:.6}
 #radarView{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;overflow:auto;background:radial-gradient(circle at 50% 40%,#0a1a2a 0%,#070b12 70%)}
 #radar{width:min(92vw,420px);aspect-ratio:1/1;max-height:52vh}
 #radarList{list-style:none;margin:0;padding:0 0 150px;width:min(92vw,460px);font-size:14px}
@@ -37,7 +38,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #answerInput:disabled{opacity:.5}
 #answerBtn{background:var(--cy);border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer}
 #answerBtn:disabled{background:#10344a;color:#4a7a93;cursor:not-allowed}
-#btnBonusGo{width:100%;margin-top:4px;background:var(--cy);border:0;border-radius:8px;padding:10px;font-weight:700;cursor:pointer}
+#btnBonusGo,#btnFact{width:100%;margin-top:4px;background:var(--cy);border:0;border-radius:8px;padding:10px;font-weight:700;cursor:pointer}
 .hint{font-size:12px;color:var(--warn);margin-top:6px}
 .timer{font-size:26px;font-weight:800;color:var(--warn);text-align:center}
 .timer.danger{color:var(--err);animation:blink 1s infinite}
@@ -91,6 +92,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
     <button id="answerBtn">Ответить</button>
    </div>
    <button id="btnBonusGo" hidden>⏱ Начать бонус-рейд</button>
+   <button id="btnFact" hidden>➡ Дальше</button>
    <div id="hintLine" class="hint" hidden></div>
   </div>
  </div>
@@ -98,7 +100,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 
 <div id="ovStart" class="overlay"><div class="box">
  <h2>🧭 GPS Квест: Рязань</h2>
- <p>Ходи по городу и находи точки: переключайся между <b>картой</b> и <b>радаром</b>. У точки откроется загадка — ответишь верно, появится следующая.<br><br>Откроешь все основные точки — разблокируется <b>бонус-рейд</b>: 10 минут, только радар, собери фрагменты ключа.<br><br><i>Геолокация работает по HTTPS или localhost (GitHub Pages подходит). Для проверки дома включи 🧪 Тест.</i></p>
+ <p>Ходи по городу и находи точки: переключайся между <b>картой</b> и <b>радаром</b>. У точки откроется загадка — ответишь верно, получишь интересный факт о месте и следующую точку.<br><br>Откроешь все основные точки — разблокируется <b>бонус-рейд</b>: 10 минут, только радар, собери фрагменты ключа.<br><br><i>Геолокация работает по HTTPS или localhost (GitHub Pages подходит). Для проверки дома включи 🧪 Тест.</i></p>
  <button id="btnStart">🛰 Начать игру</button>
 </div></div>
 
@@ -133,16 +135,16 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 const CONFIG = {
   supabaseUrl: 'https://uitjtiujqfypylnjcqsr.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8',
-  arriveRadius: 40,      // метров до точки по умолчанию
-  bonusSeconds: 600,     // 10 минут на бонус-рейд
+  arriveRadius: 40,
+  bonusSeconds: 600,
   cityCenter: [54.6269, 39.7408]
 };
 
-/* Демо-точки: используются, пока Supabase не подключен/пуст. Замени своими в БД. */
+/* Демо-точки: используются, только пока Supabase не подключен/пуст. */
 const DEMO = [
- {id:'d1',order:10,kind:'main',title:'Памятник Скобелеву',lat:54.608688,lng:39.812258,desc:'ДЕМО-загадка: сколько букв «Е» в слове «СКОБЕЛЕВ» на постаменте?',answer:'2',hint:'С-К-О-Б-Е-Л-Е-В'},
- {id:'d2',order:20,kind:'main',title:'Рязанский кремль',lat:54.6347,lng:39.7544,desc:'ДЕМО: на какой реке стоит Рязань?',answer:'ока',hint:'Не Волга'},
- {id:'d3',order:30,kind:'main',title:'Улица Почтовая',lat:54.6262,lng:39.7408,desc:'ДЕМО: сколько месяцев в году?',answer:'12',hint:'Больше десяти'},
+ {id:'d1',order:10,kind:'main',title:'Памятник Скобелеву',lat:54.608688,lng:39.812258,desc:'ДЕМО-загадка: сколько букв «Е» в слове «СКОБЕЛЕВ» на постаменте?',answer:'2',hint:'С-К-О-Б-Е-Л-Е-В',comment:'Михаил Дмитриевич Скобелев (1843—1882) — один из самых выдающихся и популярных русских военачальников Российской империи, генерал от инфантерии и генерал-адъютант. В историю он вошел под легендарным прозвищем «Белый генерал» (на Балканах и в Средней Азии — «Ак-паша»), поскольку в сражениях всегда появлялся на белом коне и в белом мундире. За свою короткую жизнь (прожил всего 38 лет) он провел 70 битв и не проиграл ни одной.'},
+ {id:'d2',order:20,kind:'main',title:'Рязанский кремль',lat:54.6347,lng:39.7544,desc:'ДЕМО: на какой реке стоит Рязань?',answer:'ока',hint:'Не Волга',comment:'Рязанский кремль — один из старейших музеев России под открытым небом: музей основан в 1887 году. Высота Успенского собора с крестом — около 83 метров.'},
+ {id:'d3',order:30,kind:'main',title:'Улица Почтовая',lat:54.6262,lng:39.7408,desc:'ДЕМО: сколько месяцев в году?',answer:'12',hint:'Больше десяти',comment:''},
  {id:'d4',order:40,kind:'main',title:'Площадь Победы',lat:54.6172,lng:39.7283,desc:'ДЕМО: сколько ног у паука?',answer:'8',hint:'Не шесть'},
  {id:'d5',order:50,kind:'main',title:'Городской парк',lat:54.6229,lng:39.7501,desc:'ДЕМО: сколько цветов в радуге?',answer:'7',hint:'Каждый охотник...'},
  {id:'d6',order:60,kind:'main',title:'Речной порт',lat:54.6402,lng:39.7689,desc:'ДЕМО: сколько колёс у автомобиля?',answer:'4',hint:'Запаску не считаем'},
@@ -156,7 +158,7 @@ const DEMO = [
 ];
 
 const $ = id => document.getElementById(id);
-const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false};
+const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null};
 const LS = 'gq_progress_v1';
 function saveProg(){ localStorage.setItem(LS, JSON.stringify([...S.opened])); }
 function loadProg(){ try{ (JSON.parse(localStorage.getItem(LS)||'[]')).forEach(x=>S.opened.add(String(x))); }catch(e){} }
@@ -179,16 +181,16 @@ let map,userMark,accCircle,targetMark,openedLayer;
 const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[36,36],iconAnchor:[18,18]});
 function initMap(){
   map=L.map('map',{zoomControl:true}).setView(CONFIG.cityCenter,13);
+  map.attributionControl.setPrefix(false); // убираем флаг и "Leaflet", оставляем © OpenStreetMap (обязательно по лицензии OSM)
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
   accCircle=L.circle([0,0],{radius:10,color:'#4fc3f7',weight:1,fillOpacity:.08,interactive:false}).addTo(map);
   userMark=L.circleMarker([0,0],{radius:7,color:'#fff',weight:2,fillColor:'#4fc3f7',fillOpacity:0,opacity:0}).addTo(map);
   openedLayer=L.layerGroup().addTo(map);
   targetMark=L.marker([0,0],{icon:pulseIcon,interactive:false,opacity:0}).addTo(map);
   map.on('click',e=>{ if(S.testMode&&S.started){ setPos(e.latlng.lat,e.latlng.lng,5); toast('🧪 Телепорт: '+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)); } });
-  map.attributionControl.setPrefix(false);
 }
 function refreshMarkers(){
-  const t=(S.phase==='main')?target():null;
+  const t=(S.phase==='main'&&!S.fact)?target():null; // во время экрана факта следующая точка не светится
   if(t){ targetMark.setLatLng([t.lat,t.lng]); targetMark.setOpacity(1); } else targetMark.setOpacity(0);
   openedLayer.clearLayers();
   S.quests.filter(q=>S.opened.has(String(q.id))).forEach(q=>{
@@ -229,13 +231,14 @@ function updateGame(){
       }
     }
   }
-  const rel=(S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id)));
+  const rel=S.fact?[]:((S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id))));
   S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
   S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
   renderRadarList();renderCard();refreshMarkers();
 }
 function renderRadarList(){
   const ul=$('radarList');
+  if(S.fact){ul.innerHTML='<li>✅ Точка открыта — читай факт на карточке.</li>';return;}
   if(!S.pos){ul.innerHTML='<li>🛰 Ждём координаты... (дома включи 🧪 и кликни по карте)</li>';return;}
   if(!S.blips.length){ul.innerHTML='<li>Активных точек нет</li>';return;}
   ul.innerHTML=S.blips.slice(0,6).map(b=>'<li><span>'+b.t+'</span><b>'+fmtDist(b.d)+' · '+dirName(b.b)+'</b></li>').join('');
@@ -244,9 +247,20 @@ function renderFrags(){
   $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?q.answer:'???')+'</span>';}).join('');
 }
 function renderCard(){
-  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo');
+  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
   if(S.phase==='won'){$('card').hidden=true;return;}
   $('card').hidden=false;
+  /* --- экран факта после верного ответа --- */
+  if(S.fact){
+    $('cardTitle').textContent='✅ Правильный ответ!';
+    $('cardDesc').textContent=S.fact.comment||'Точка открыта! Двигаемся дальше.';
+    $('cardDist').textContent='';
+    bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;
+    fb.hidden=false;
+    fb.textContent=(mainsDone()&&bonuses().length)?'🏆 Дальше: бонус-рейд':'➡ Дальше';
+    return;
+  }
+  fb.hidden=true;
   if(S.phase==='bonus'){
     $('cardTitle').textContent='🔑 Бонус-рейд: собери фрагменты!';
     $('cardDesc').textContent='На радаре — скрытые точки. Подойди к каждой вплотную, фрагмент добавится сам.';
@@ -260,19 +274,28 @@ function renderCard(){
     $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
     $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
   }
-  bg.hidden=true;ar.hidden=false;
-  $('cardTitle').textContent='🎯 '+t.title;
-  $('cardDesc').textContent=t.desc||'';
+    bg.hidden=true;
+  $('cardTitle').textContent=S.atPoint?('🎯 '+t.title):('🎯 Точка '+(mains().indexOf(t)+1)+' из '+mains().length);
   let dTxt;
   if(S.pos){
     const d=distM(S.pos[0],S.pos[1],t.lat,t.lng);
     S.atPoint=d<=t.radius;
-    dTxt=S.atPoint?'✅ Ты на точке! Отвечай на загадку.':'📏 До точки: '+fmtDist(d)+' ('+dirName(bearing(S.pos[0],S.pos[1],t.lat,t.lng))+')';
+    dTxt=S.atPoint?'✅ Ты на точке! Загадка открыта.':'📏 До точки: '+fmtDist(d)+' ('+dirName(bearing(S.pos[0],S.pos[1],t.lat,t.lng))+')';
   } else {S.atPoint=false;dTxt='🛰 Ждём координаты...';}
   $('cardDist').textContent=dTxt;
-  $('answerInput').disabled=!S.atPoint;$('answerBtn').disabled=!S.atPoint;
-  const w=S.wrong[t.id]||0;
-  if(w>=2&&t.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+t.hint;}else hl.hidden=true;
+  if(S.atPoint){
+    /* дошли: показываем загадку и поле ответа */
+    $('cardDesc').textContent=t.desc||'';
+    ar.hidden=false;
+    $('answerInput').disabled=false;$('answerBtn').disabled=false;
+    const w=S.wrong[t.id]||0;
+    if(w>=2&&t.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+t.hint;}else hl.hidden=true;
+  } else {
+    /* ещё в пути: загадку не показываем, чтобы не спойлерить */
+    $('cardDesc').textContent='🔒 Загадка откроется, когда подойдёшь к точке.';
+    ar.hidden=true;hl.hidden=true;
+  }
+}
 }
 function submitAnswer(){
   const t=target();if(!t||!S.atPoint)return;
@@ -280,8 +303,7 @@ function submitAnswer(){
   const ok=String(t.answer).split('|').some(a=>normAns(a)===v);
   if(ok){
     S.opened.add(String(t.id));saveProg();S.wrong[t.id]=0;$('answerInput').value='';
-    toast('✅ Точка «'+t.title+'» открыта!');
-    if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;
+    S.fact=t; // показываем факт, следующая точка появится после кнопки «Дальше»
     updateGame();
   } else {
     S.wrong[t.id]=(S.wrong[t.id]||0)+1;
@@ -297,14 +319,14 @@ function tick(){
   el.classList.toggle('danger',left<60000);
 }
 function startBonus(){
-  S.phase='bonus';S.lockRadar=true;$('btnMap').disabled=true;setMode('radar');
+  S.phase='bonus';S.fact=null;S.lockRadar=true;$('btnMap').disabled=true;setMode('radar');
   S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
   clearInterval(S.timerId);S.timerId=setInterval(tick,250);tick();
   $('ovBonus').hidden=true;$('ovFail').hidden=true;
   updateGame();toast('⏱ Рейд начался! У тебя 10 минут.');
 }
 function win(){
-  S.phase='won';clearInterval(S.timerId);S.lockRadar=false;
+  S.phase='won';S.fact=null;clearInterval(S.timerId);S.lockRadar=false;
   $('winKey').textContent=bonuses().map(q=>q.answer).join('-');
   $('ovWin').hidden=false;updateGame();
 }
@@ -364,6 +386,7 @@ async function loadQuests(){
   S.quests=src.map((r,i)=>({
     id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
     desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
+    comment:(r.comment!=null?String(r.comment):''),
     order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
   })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
   if(rows&&S.quests.some(q=>q.kind==='main'&&!q.answer))toast('⚠️ В БД нет колонки answer — выполни SQL из инструкции, иначе загадки не проверить.',10000);
@@ -377,13 +400,14 @@ loadProg();initMap();
 $('btnMap').onclick=()=>setMode('map');
 $('btnRadar').onclick=()=>setMode('radar');
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
-$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;updateGame();toast('Прогресс сброшен.');};
+$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;updateGame();toast('Прогресс сброшен.');};
 $('btnStart').onclick=()=>{$('ovStart').hidden=true;S.started=true;startGeo();};
 $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
 $('btnFailRetry').onclick=startBonus;
 $('btnWinClose').onclick=()=>$('ovWin').hidden=true;
+$('btnFact').onclick=()=>{S.fact=null;updateGame();if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;};
 $('answerBtn').onclick=submitAnswer;
 $('answerInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitAnswer();});
 loadQuests();
