@@ -65,7 +65,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 <body>
 <div id="app">
  <header>
-  <div class="ttl">🧭 GPS QUEST</div>
+  <div class="ttl" id="ttl">🧭 GPS QUEST</div>
   <div id="progress" class="chip" style="cursor:default">🚩 0/0</div>
   <div class="seg">
    <button id="btnMap" class="on">🗺 Карта</button>
@@ -73,6 +73,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   </div>
   <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт">🧪 Тест</button>
   <button id="btnDebug" class="chip" title="Отладка: номера точек и связи маршрута">🐞 Отладка</button>
+  <button id="btnCode" class="chip" title="Ввести код">🔑 Код</button>
   <button id="btnReset" class="chip" title="Сбросить прогресс">⟲</button>
  </header>
  <div id="geoStatus" class="wait">🛰 Геолокация ещё не запрошена.</div>
@@ -103,8 +104,10 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 
 <div id="ovStart" class="overlay"><div class="box">
  <h2>🧭 GPS Квест: Рязань</h2>
- <p>Ходи по городу и находи точки: переключайся между <b>картой</b> и <b>радаром</b>. У точки откроется загадка — ответишь верно, получишь интересный факт о месте и следующую точку.<br><br>Откроешь все основные точки — разблокируется <b>бонус-рейд</b>: 10 минут, только радар, собери фрагменты ключа.<br><br><i>Геолокация работает по HTTPS или localhost (GitHub Pages подходит). Для проверки дома включи 🧪 Тест.</i></p>
- <button id="btnStart">🛰 Начать игру</button>
+ <p>Городской квест-бродилка с загадками. Квест открывается <b>кодовым словом</b> — есть оно у тебя? Введи ниже.<br><br>У точки откроется загадка: ответишь верно — получишь факт о месте и следующую точку. Откроешь все — разблокируется <b>бонус-рейд</b>: 10 минут и только радар, чтобы собрать ключ.<br><br><i>Геолокация работает по HTTPS или localhost. Дома проверяй через 🧪 Тест. Служебное кодовое слово <b>demo</b> поднимает демо-маршрут без базы.</i></p>
+ <input id="startCode" placeholder="Кодовое слово, например BELY-GENERAL-1882" autocomplete="off"
+  style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:12px;font-size:16px;margin-top:6px">
+ <button id="btnStart">🔑 Ввести и начать</button>
 </div></div>
 
 <div id="ovBonus" class="overlay" hidden><div class="box">
@@ -126,6 +129,15 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
  <h2>⏰ Время вышло!</h2>
  <p>Ключ растворился в эфире... Собранные фрагменты остались с тобой. Попробуй ещё раз!</p>
  <button id="btnFailRetry">🔄 Повторить рейд (10:00)</button>
+</div></div>
+
+ <div id="ovCode" class="overlay" hidden><div class="box">
+ <h2>🔑 Секретный код</h2>
+ <p>Есть код скрытого квеста? Введи его — карта перестроится на новый маршрут.</p>
+ <input id="codeInput" placeholder="Например: BELY-GENERAL-1882" autocomplete="off"
+  style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:10px;font-size:15px;margin-top:6px">
+ <button id="btnCodeGo">Войти</button>
+ <button id="btnCodeBack" class="sec">Отмена</button>
 </div></div>
 
 <div id="toast"></div>
@@ -161,10 +173,16 @@ const DEMO = [
 ];
 
 const $ = id => document.getElementById(id);
-const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false};
+const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null};
 const LS = 'gq_progress_v1';
-function saveProg(){ localStorage.setItem(LS, JSON.stringify([...S.opened])); }
-function loadProg(){ try{ (JSON.parse(localStorage.getItem(LS)||'[]')).forEach(x=>S.opened.add(String(x))); }catch(e){} }
+const progKey = () => LS + ':' + S.scenario.slug;
+function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
+function loadProg(){
+  S.opened.clear();
+  let key = progKey();
+  if(S.scenario.slug==='main' && !localStorage.getItem(key)) key = LS; // миграция старого прогресса
+  try{ (JSON.parse(localStorage.getItem(key)||'[]')).forEach(x=>S.opened.add(String(x))); }catch(e){}
+}
 
 /* ---------- гео-математика ---------- */
 function distM(lat1,lng1,lat2,lng2){const R=6371000,r=Math.PI/180,dLa=(lat2-lat1)*r,dLo=(lng2-lng1)*r;const a=Math.sin(dLa/2)**2+Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(a));}
@@ -279,6 +297,12 @@ function renderCard(){
   const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
   if(S.phase==='won'){$('card').hidden=true;return;}
   $('card').hidden=false;
+  if(!S.quests.length){
+    $('cardTitle').textContent='🔑 Ждём загрузки квеста';
+    $('cardDesc').textContent='Введи кодовое слово в приветственном окне — и маршрут появится на карте.';
+    $('cardDist').textContent='';
+    bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;fb.hidden=true;return;
+  } 
   /* --- экран факта после верного ответа --- */
   if(S.fact){
     $('cardTitle').textContent='✅ Правильный ответ!';
@@ -303,14 +327,14 @@ function renderCard(){
     $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
     $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
   }
-    bg.hidden=true;
-  $('cardTitle').textContent=S.atPoint?('🎯 '+t.title):('🎯 Точка '+(mains().indexOf(t)+1)+' из '+mains().length);
+   bg.hidden=true;
   let dTxt;
   if(S.pos){
     const d=distM(S.pos[0],S.pos[1],t.lat,t.lng);
     S.atPoint=d<=t.radius;
     dTxt=S.atPoint?'✅ Ты на точке! Загадка открыта.':'📏 До точки: '+fmtDist(d)+' ('+dirName(bearing(S.pos[0],S.pos[1],t.lat,t.lng))+')';
   } else {S.atPoint=false;dTxt='🛰 Ждём координаты...';}
+  $('cardTitle').textContent=S.atPoint?('🎯 '+t.title):('🎯 Точка '+(mains().indexOf(t)+1)+' из '+mains().length);
   $('cardDist').textContent=dTxt;
   if(S.atPoint){
     /* дошли: показываем загадку и поле ответа */
@@ -397,9 +421,52 @@ let toastT;
 function toast(msg,ms=3500){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),ms);}
 
 /* ---------- загрузка квестов из Supabase (fallback: демо) ---------- */
-async function loadQuests(){
-  let rows=null,note='';
-  const url=CONFIG.supabaseUrl,key=CONFIG.supabaseAnonKey;
+/* ---------- загрузка: публичный сценарий или секретный по коду ---------- */
+function normalizeRows(src){
+  return src.map((r,i)=>({
+    id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
+    desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
+    comment:(r.comment!=null?String(r.comment):''),
+    order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
+  })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
+}
+function applyScenario(meta, quests, note){
+  S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={};
+  clearInterval(S.timerId); S.lockRadar=false; $('btnMap').disabled=false;
+  $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true;
+  loadProg();
+  S.quests=quests;
+  document.title='GPS Квест: '+(meta.title||'Рязань');
+  $('ttl').textContent='🧭 GPS QUEST'+(meta.title?(': '+meta.title):'');
+  const all=S.quests.map(q=>[q.lat,q.lng]);
+  if(all.length&&!S.debug){ map.fitBounds(L.latLngBounds(all),{padding:[60,60]}); S.centered=false; }
+  if(note)toast(note,8000);
+  updateGame(); renderDebug();
+  if(!S.quests.length)toast('⚠️ В сценарии нет точек.',12000);
+}
+async function loadByCode(code, silent){
+  if(normAns(code)==='demo'||normAns(code)==='демо'){
+    localStorage.setItem('gq_code',code);
+    applyScenario({slug:'demo',title:'Демо (без БД)',code:code},normalizeRows(DEMO),'🧪 Загружен демо-маршрут (без базы).');
+    return true;
+  }
+  const url=CONFIG.supabaseUrl, key=CONFIG.supabaseAnonKey;
+  try{
+    const r=await fetch(url+'/rest/v1/rpc/load_scenario',{method:'POST',
+      headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},
+      body:JSON.stringify({p_code:code})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    if(!data||!data.slug){ if(!silent)toast('❌ Код не распознан.'); return false; }
+    localStorage.setItem('gq_code', code);
+    applyScenario({slug:data.slug,title:data.title||data.slug,code:code}, normalizeRows(data.quests||[]),
+      '🔑 Сценарий «'+(data.title||data.slug)+'» загружен!');
+    return true;
+  }catch(e){ if(!silent)toast('⚠️ Не удалось проверить код: '+e.message); return false; }
+}
+async function loadPublic(){
+  let rows=null, note='';
+  const url=CONFIG.supabaseUrl, key=CONFIG.supabaseAnonKey;
   if(!url||!key||url.includes('YOUR-PROJECT'))note='Supabase не настроена — загружены демо-точки.';
   else{
     try{
@@ -411,17 +478,12 @@ async function loadQuests(){
     }catch(e){note='Supabase недоступна ('+e.message+'). Загружены демо-точки.';}
   }
   const src=rows||DEMO;
-  S.quests=src.map((r,i)=>({
-    id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
-    desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
-    comment:(r.comment!=null?String(r.comment):''),
-    order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
-  })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
-  if(rows&&S.quests.some(q=>q.kind==='main'&&!q.answer))toast('⚠️ В БД нет колонки answer — выполни SQL из инструкции, иначе загадки не проверить.',10000);
-  if(note)toast(note,8000);
-  updateGame();
-  renderDebug();
-  if(!S.quests.length)toast('⚠️ Точек нет вообще: БД пуста, а список DEMO в файле пуст или с ошибкой в именах полей.',12000);
+  applyScenario({slug:'main',title:'',code:null}, normalizeRows(src), note);
+  if(rows&&S.quests.some(q=>q.kind==='main'&&!q.answer))toast('⚠️ В БД нет колонки answer — выполни SQL из инструкции.',10000);
+}
+function prefillCode(){
+  const urlCode=new URLSearchParams(location.search).get('q');
+  $('startCode').value=urlCode||localStorage.getItem('gq_code')||'';
 }
 
 /* ---------- старт ---------- */
@@ -431,16 +493,27 @@ $('btnRadar').onclick=()=>setMode('radar');
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
 $('btnDebug').onclick=toggleDebug;
 $('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;updateGame();toast('Прогресс сброшен.');};
-$('btnStart').onclick=()=>{$('ovStart').hidden=true;S.started=true;startGeo();};
+$('btnStart').onclick=async()=>{
+  const code=$('startCode').value.trim();
+  if(!code){toast('🔑 Введи кодовое слово квеста');return;}
+  const ok=await loadByCode(code,false);
+  if(ok){$('ovStart').hidden=true;S.started=true;startGeo();}
+};
+$('startCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnStart').click();});
 $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
 $('btnFailRetry').onclick=startBonus;
 $('btnWinClose').onclick=()=>$('ovWin').hidden=true;
 $('btnFact').onclick=()=>{S.fact=null;updateGame();if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;};
+$('btnCode').onclick=()=>{$('ovCode').hidden=false;$('codeInput').value='';};
+$('btnCodeGo').onclick=async()=>{const v=$('codeInput').value.trim();if(!v)return;if(await loadByCode(v,false))$('ovCode').hidden=true;};
+$('codeInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnCodeGo').click();});
+$('btnCodeBack').onclick=()=>{$('ovCode').hidden=true;};
 $('answerBtn').onclick=submitAnswer;
 $('answerInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitAnswer();});
-loadQuests();
+ 
+prefillCode();
 requestAnimationFrame(loop);
 </script>
 </body>
