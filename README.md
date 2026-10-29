@@ -1,2 +1,2 @@
 # gps-quest-game
-My first GPS-orinted game
+My first GPS-oriented game
