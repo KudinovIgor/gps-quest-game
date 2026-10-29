@@ -140,6 +140,15 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
  <button id="btnCodeBack" class="sec">Отмена</button>
 </div></div>
 
+ <div id="ovPass" class="overlay" hidden><div class="box">
+ <h2>🛠 Пароль редактора</h2>
+ <p>Нужен один раз за сеанс, чтобы сохранить перенесённую точку в базу.</p>
+ <input id="passInput" type="password" placeholder="Пароль редактора" autocomplete="off"
+  style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:10px;font-size:15px;margin-top:6px">
+ <button id="btnPassOk">Сохранить точку</button>
+ <button id="btnPassCancel" class="sec">Отмена</button>
+</div></div>
+
 <div id="toast"></div>
 
 <script>
@@ -220,24 +229,22 @@ function refreshMarkers(){
 }
 
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
-function renderDebug(){
+function renderDebug(fit){
   if(debugLayer){map.removeLayer(debugLayer);debugLayer=null;}
   if(!S.debug)return;
   debugLayer=L.layerGroup().addTo(map);
   const ms=mains(),bs=bonuses();
   if(ms.length>1)L.polyline(ms.map(q=>[q.lat,q.lng]),{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
-  ms.forEach((q,i)=>{
-    L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg">'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500})
-      .bindTooltip((i+1)+'. '+q.title+' | sort_order='+q.order+' | id='+q.id,{direction:'top',offset:[0,-10]})
+  const mk=(q,label,cls)=>{
+    const m=L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg '+cls+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500,draggable:true})
+      .bindTooltip(label+'. '+q.title+' | sort_order='+q.order+' | id='+q.id+' | перетащи, чтобы уточнить',{direction:'top',offset:[0,-10]})
       .addTo(debugLayer);
-  });
-  bs.forEach((q,i)=>{
-    L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg bonus">Б'+(i+1)+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500})
-      .bindTooltip('Б'+(i+1)+'. '+q.title+' | sort_order='+q.order+' | id='+q.id,{direction:'top',offset:[0,-10]})
-      .addTo(debugLayer);
-  });
+    m.on('dragend',()=>{const p=m.getLatLng();q.lat=p.lat;q.lng=p.lng;onQuestMoved(q,label);});
+  };
+  ms.forEach((q,i)=>mk(q,i+1,''));
+  bs.forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
   const all=S.quests.map(q=>[q.lat,q.lng]);
-  if(all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
+  if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
 }
 function toggleDebug(){
   S.debug=!S.debug;
@@ -246,6 +253,40 @@ function toggleDebug(){
   toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
 }
 /* ---------- геолокация с честными ошибками ---------- */
+/* ---------- отладка: перенос точек с сохранением в БД ---------- */
+async function rpcMove(q, pass){
+  try{
+    const r=await fetch(CONFIG.supabaseUrl+'/rest/v1/rpc/move_quest',{method:'POST',
+      headers:{apikey:CONFIG.supabaseAnonKey,Authorization:'Bearer '+CONFIG.supabaseAnonKey,'Content-Type':'application/json'},
+      body:JSON.stringify({p_id:Number(q.id),p_lat:q.lat,p_lng:q.lng,p_pass:pass})});
+    if(!r.ok)return false;
+    return (await r.json())===true;
+  }catch(e){return false;}
+}
+function askEditorPass(){
+  return new Promise(res=>{
+    const ov=$('ovPass');ov.hidden=false;$('passInput').value='';
+    const done=v=>{ov.hidden=true;res(v);};
+    $('btnPassOk').onclick=()=>done($('passInput').value.trim()||null);
+    $('btnPassCancel').onclick=()=>done(null);
+  });
+}
+async function saveQuestPos(q){
+  let pass=sessionStorage.getItem('gq_editor_pass');
+  if(pass&&await rpcMove(q,pass))return true;
+  pass=await askEditorPass();
+  if(!pass)return false;
+  const ok=await rpcMove(q,pass);
+  if(ok)sessionStorage.setItem('gq_editor_pass',pass);
+  else toast('❌ Неверный пароль редактора.');
+  return ok;
+}
+async function onQuestMoved(q,label){
+  renderDebug();updateGame();
+  if(S.scenario.slug==='demo'){toast('🧪 Точка '+label+' перенесена (демо, в БД не пишется): '+q.lat.toFixed(5)+', '+q.lng.toFixed(5),6000);return;}
+  toast('📍 Точка '+label+': '+q.lat.toFixed(5)+', '+q.lng.toFixed(5)+' — сохраняю...');
+  if(await saveQuestPos(q))toast('💾 Точка '+label+' сохранена в БД.');
+}
 function geoStatus(cls,txt){const el=$('geoStatus');el.className=cls;el.textContent=txt;}
 function setPos(lat,lng,acc){
   S.pos=[lat,lng];S.acc=acc||50;
@@ -500,6 +541,7 @@ $('btnStart').onclick=async()=>{
   if(ok){$('ovStart').hidden=true;S.started=true;startGeo();}
 };
 $('startCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnStart').click();});
+$('passInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnPassOk').click();});
 $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
