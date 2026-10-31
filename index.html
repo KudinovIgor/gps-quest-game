@@ -240,7 +240,7 @@ const target=()=>mains().find(q=>!S.opened.has(String(q.id)));
 const mainsDone=()=>mains().length>0&&mains().every(q=>S.opened.has(String(q.id)));
 
 /* ---------- карта (Leaflet + OpenStreetMap, БЕЗ ключей) ---------- */
-let map,userMark,accCircle,targetMark,openedLayer,debugLayer=null;
+let map,userMark,accCircle,targetMark,openedLayer,debugLayer=null,zoneCircle;
 const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[36,36],iconAnchor:[18,18]});
 function initMap(){
   map=L.map('map',{zoomControl:true}).setView(CONFIG.cityCenter,13);
@@ -250,11 +250,20 @@ function initMap(){
   userMark=L.circleMarker([0,0],{radius:7,color:'#fff',weight:2,fillColor:'#4fc3f7',fillOpacity:0,opacity:0}).addTo(map);
   openedLayer=L.layerGroup().addTo(map);
   targetMark=L.marker([0,0],{icon:pulseIcon,interactive:false,opacity:0}).addTo(map);
+  zoneCircle=L.circle([0,0],{radius:CONFIG.arriveRadius,color:'#00e5ff',weight:1.5,dashArray:'5 5',fillColor:'#00e5ff',fillOpacity:0,opacity:0,interactive:false}).addTo(map);
   map.on('click',e=>{ if(S.testMode&&S.started){ setPos(e.latlng.lat,e.latlng.lng,5); toast('🧪 Телепорт: '+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)); } });
 }
 function refreshMarkers(){
   const t=(S.phase==='main'&&!S.fact)?target():null; // во время экрана факта следующая точка не светится
-  if(t){ targetMark.setLatLng([t.lat,t.lng]); targetMark.setOpacity(1); } else targetMark.setOpacity(0);
+  if(t){
+    targetMark.setLatLng([t.lat,t.lng]); targetMark.setOpacity(1);
+    zoneCircle.setLatLng([t.lat,t.lng]); zoneCircle.setRadius(t.radius);
+    zoneCircle.setStyle(S.atPoint
+      ? {color:'#00ff66',fillColor:'#00ff66',opacity:.9,fillOpacity:.15}   // ты внутри зоны
+      : {color:'#00e5ff',fillColor:'#00e5ff',opacity:.9,fillOpacity:.08}); // ещё идёшь
+  } else {
+    targetMark.setOpacity(0); zoneCircle.setStyle({opacity:0,fillOpacity:0});
+  }
   openedLayer.clearLayers();
   S.quests.filter(q=>S.opened.has(String(q.id))).forEach(q=>{
     L.circleMarker([q.lat,q.lng],{radius:6,color:'#7a8ba3',weight:1,fillColor:'#33506a',fillOpacity:1}).bindTooltip(q.title).addTo(openedLayer);
@@ -268,6 +277,7 @@ function renderDebug(fit){
   debugLayer=L.layerGroup().addTo(map);
   const ms=mains(),bs=bonuses();
   if(ms.length>1)L.polyline(ms.map(q=>[q.lat,q.lng]),{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
+  S.quests.forEach(q=>{ L.circle([q.lat,q.lng],{radius:q.radius,color:'#00ff66',weight:1,opacity:.45,dashArray:'3 4',fillOpacity:0,interactive:false}).addTo(debugLayer); });
   const mk=(q,label,cls)=>{
     const m=L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg '+cls+(S.delMode?' del':'')+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500,draggable:true})
       .bindTooltip(label+'. '+q.title+' | sort_order='+q.order+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]})
