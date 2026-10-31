@@ -35,6 +35,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #card h3{margin:0 0 6px;color:var(--cy);font-size:16px}
 #card .desc{font-size:13px;line-height:1.45;color:#9fc6e8;margin-bottom:8px;white-space:pre-line}
 #card .dist{font-size:13px;color:var(--gr);margin-bottom:8px}
+#cardDist:empty{display:none}
 #answerRow{display:flex;gap:8px}
 #answerInput{flex:1;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:10px;font-size:15px}
 #answerInput:disabled{opacity:.5}
@@ -95,8 +96,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   </div>
   <div id="card">
    <h3 id="cardTitle">Загрузка...</h3>
-   <div class="desc" id="cardDesc"></div>
    <div class="dist" id="cardDist"></div>
+   <div class="desc" id="cardDesc"></div>
    <div id="bonusInfo" hidden>
     <div id="bonusTimer" class="timer">10:00</div>
     <div id="frags"></div>
