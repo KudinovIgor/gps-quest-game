@@ -301,6 +301,20 @@ function refreshMarkers(){
   });
 }
 
+/* ---------- функция группировки заданий ---------- */
+function computeStages(){
+  const stages=[];
+  for(const q of S.quests){           // S.quests уже отсортированы по sort_order
+    const last=stages[stages.length-1];
+    if(last && /* q подходит в текущую группу? */){ 
+     /* добавить q в last.qs */ 
+    }
+    else {
+     stages.push({kind:q.kind, qs:[q]});
+  }
+  return stages;
+}
+ 
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
   if(debugLayer){
@@ -459,7 +473,10 @@ function setPos(lat,lng,acc){
   geoStatus('ok','🛰 GPS: точность ±'+Math.round(S.acc)+' м'+(S.testMode?' (тест)':''));
   userMark.setLatLng(S.pos);userMark.setStyle({fillOpacity:1,opacity:1});
   accCircle.setLatLng(S.pos);accCircle.setRadius(S.acc);
-  if(!S.centered){map.setView(S.pos,16);S.centered=true;}
+  if(!S.centered){
+   map.setView(S.pos,16);
+   S.centered=true;
+  }
   updateGame();
 }
 function startGeo(){
@@ -476,26 +493,50 @@ function startGeo(){
 let audioCtx=null,foxOsc=null,foxGain=null,lastBeepAt=0;
 function ensureAudio(){ try{ if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended')audioCtx.resume(); }catch(e){} }
 function beep(freq,dur,vol){
-  if(!audioCtx)return;
+  if(!audioCtx)
+   return;
   const o=audioCtx.createOscillator(),g=audioCtx.createGain();
-  o.type='sine';o.frequency.value=freq||880;
+  o.type='sine';
+  o.frequency.value=freq||880;
   g.gain.setValueAtTime(0,audioCtx.currentTime);
   g.gain.linearRampToValueAtTime(vol||0.22,audioCtx.currentTime+0.01);
   g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+(dur||0.09));
   o.connect(g);g.connect(audioCtx.destination);
-  o.start();o.stop(audioCtx.currentTime+(dur||0.09)+0.02);
+  o.start();
+  o.stop(audioCtx.currentTime+(dur||0.09)+0.02);
 }
 function foxContinuous(on){
   if(on){
     if(!foxOsc&&audioCtx){
-      foxOsc=audioCtx.createOscillator();foxGain=audioCtx.createGain();
-      foxOsc.type='sine';foxOsc.frequency.value=1250;foxGain.gain.value=0.16;
-      foxOsc.connect(foxGain);foxGain.connect(audioCtx.destination);foxOsc.start();
+      foxOsc=audioCtx.createOscillator();
+      foxGain=audioCtx.createGain();
+      foxOsc.type='sine';
+      foxOsc.frequency.value=1250;
+      foxGain.gain.value=0.16;
+      foxOsc.connect(foxGain);
+      foxGain.connect(audioCtx.destination);
+      foxOsc.start();
     }
-  } else if(foxOsc){ try{foxOsc.stop();}catch(e){} foxOsc.disconnect();foxOsc=null;foxGain=null; }
+  } else if(foxOsc){ 
+   try{
+    foxOsc.stop();
+   }
+   catch(e){} 
+   foxOsc.disconnect();
+   foxOsc=null;
+   foxGain=null; }
 }
-function startFoxBeeps(){ ensureAudio(); clearInterval(S.foxTimer); lastBeepAt=0; S.foxTimer=setInterval(foxTick,100); }
-function stopFoxAudio(){ clearInterval(S.foxTimer); S.foxTimer=null; foxContinuous(false); }
+function startFoxBeeps(){ 
+ ensureAudio(); 
+ clearInterval(S.foxTimer); 
+ lastBeepAt=0; 
+ S.foxTimer=setInterval(foxTick,100); 
+}
+function stopFoxAudio(){ 
+ clearInterval(S.foxTimer); 
+ S.foxTimer=null; 
+ foxContinuous(false); 
+}
 function foxTick(){
   if(S.mode!=='fox'||!audioCtx)return;
   if(S.foxQuiz||S.fact){foxContinuous(false);return;}   // тишина, пока читаем загадку/факт
