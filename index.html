@@ -31,6 +31,14 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #radarList{list-style:none;margin:0;padding:0 0 150px;width:min(92vw,460px);font-size:14px}
 #radarList li{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid #16324a;border-radius:8px;margin-top:6px;background:#0d1626}
 #radarList b{color:var(--gr);white-space:nowrap}
+#foxView{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;background:radial-gradient(circle at 50% 45%,#0f1a10 0%,#070b12 75%);z-index:1100}
+.foxTop{font-size:13px;color:var(--warn);letter-spacing:2px}
+.foxSigBig{font-size:64px;font-weight:800;color:var(--gr);text-shadow:0 0 18px rgba(0,255,102,.45)}
+.foxBarWrap{width:min(86vw,420px);height:26px;border:1px solid #1d4a63;border-radius:14px;overflow:hidden;background:#0a1410}
+#foxBar{height:100%;width:0%;background:linear-gradient(90deg,#0a4d2a,#00ff66);transition:width .25s}
+.foxMeta{display:flex;gap:18px;font-size:13px;color:#9fc6e8}
+#foxTrend.up{color:var(--gr)}#foxTrend.down{color:var(--err)}
+.foxHint{font-size:12px;color:#6f93b5;max-width:360px;text-align:center}
 #card{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:1200;width:min(94vw,460px);background:rgba(13,22,38,.95);border:1px solid var(--cy);border-radius:14px;padding:12px 14px;box-shadow:0 0 24px rgba(0,229,255,.25);max-height:46vh;overflow:auto}
 #card h3{margin:0 0 6px;color:var(--cy);font-size:16px}
 #card .desc{font-size:13px;line-height:1.45;color:#9fc6e8;margin-bottom:8px;white-space:pre-line}
@@ -67,7 +75,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .ed label{font-size:11px;color:#8ab4d8}
 .ed input,.ed select,.ed textarea{background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;width:100%}
 .ed .row{display:flex;gap:6px}
-.ed .row>div{flex:1;display:flex;flex-direction:column} 
+.ed .row>div{flex:1;display:flex;flex-direction:column}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -79,11 +87,12 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   <div class="seg">
    <button id="btnMap" class="on">🗺 Карта</button>
    <button id="btnRadar">📡 Радар</button>
+   <button id="btnFox">🦊 Охота</button>
   </div>
   <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт">🧪 Тест</button>
   <button id="btnDebug" class="chip" title="Отладка: номера точек и связи маршрута">🐞 Отладка</button>
   <button id="btnAdd" class="chip" title="Добавить точку (в режиме отладки)">➕</button>
-  <button id="btnDel" class="chip" title="Режим удаления: клик по точке (в отладке)">➖</button>  
+  <button id="btnDel" class="chip" title="Режим удаления: клик по точке (в отладке)">➖</button>
   <button id="btnCode" class="chip" title="Ввести код">🔑 Код</button>
   <button id="btnReset" class="chip" title="Сбросить прогресс">⟲</button>
  </header>
@@ -93,6 +102,14 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   <div id="radarView" hidden>
    <canvas id="radar"></canvas>
    <ul id="radarList"></ul>
+  </div>
+  <div id="foxView" hidden>
+   <div class="foxTop">🦊 ОХОТА НА ЛИС · поймано <span id="foxDone">0</span>/<span id="foxTotal">0</span></div>
+   <div class="foxSigBig"><span id="foxPct">--</span>%</div>
+   <div class="foxBarWrap"><div id="foxBar"></div></div>
+   <div class="foxMeta"><span id="foxTrend">сканирую эфир...</span><span id="foxDbm"></span></div>
+   <div class="foxHint">Иди туда, где сигнал и звук усиливаются. Цифры — уровень «приёма» маяка: чем ближе, тем выше. Пойдёшь не туда — сигнал упадёт.</div>
+   <button id="foxExit" class="chip">🗺 Выйти на карту</button>
   </div>
   <div id="card">
    <h3 id="cardTitle">Загрузка...</h3>
@@ -115,7 +132,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 
 <div id="ovStart" class="overlay"><div class="box">
  <h2>🧭 GPS Квест: Рязань</h2>
- <p>Городской квест-бродилка с загадками. Квест открывается <b>кодовым словом</b> — есть оно у тебя? Введи ниже.<br><br>У точки откроется загадка: ответишь верно — получишь факт о месте и следующую точку. Откроешь все — разблокируется <b>бонус-рейд</b>: 10 минут и только радар, чтобы собрать ключ.<br><br><i>Геолокация работает по HTTPS или localhost. Дома проверяй через 🧪 Тест. Служебное кодовое слово <b>demo</b> поднимает демо-маршрут без базы.</i></p>
+ <p>Городской квест-бродилка с загадками. Квест открывается <b>кодовым словом</b> — есть оно у тебя? Введи ниже.<br><br>У точки откроется загадка: ответишь верно — получишь факт о месте и следующую точку. Откроешь все — разблокируется <b>бонус-рейд</b>: 10 минут и только радар, чтобы собрать ключ. А ещё в квесте могут быть <b>лисы</b> — режим 🦊 Охота: ищи маяк по силе сигнала и звуку, без карты.<br><br><i>Геолокация работает по HTTPS или localhost. Дома проверяй через 🧪 Тест. Служебное кодовое слово <b>demo</b> поднимает демо-маршрут без базы.</i></p>
  <input id="startCode" placeholder="Кодовое слово, например BELY-GENERAL-1882" autocomplete="off"
   style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:12px;font-size:16px;margin-top:6px">
  <button id="btnStart">🔑 Ввести и начать</button>
@@ -176,27 +193,34 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   <div><label>Комментарий-факт после верного ответа</label><textarea id="edComment" rows="2"></textarea></div>
   <div class="row">
    <div><label>Порядок</label><input id="edOrder" inputmode="numeric"></div>
-   <div><label>Тип</label><select id="edKind"><option value="main">main</option><option value="bonus">bonus</option></select></div>
+   <div><label>Тип</label><select id="edKind"><option value="main">main</option><option value="bonus">bonus</option><option value="foxhunter">foxhunter</option></select></div>
    <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
   </div>
   <button id="edSave">💾 Сохранить в БД</button>
   <button id="edDelete" class="sec">🗑 Удалить точку</button>
   <button id="edCancel" class="sec">Отмена</button>
  </div>
-</div></div> 
- 
+</div></div>
+
+<div id="ovFoxDone" class="overlay" hidden><div class="box">
+ <h2>🦊 Все лисы пойманы!</h2>
+ <p>Ты вычислил все маяки по сигналу и звуку. Охота состоялась!</p>
+ <button id="btnFoxDoneClose">Продолжить</button>
+</div></div>
+
 <div id="toast"></div>
 
 <script>
 'use strict';
 /* ============ НАСТРОЙКИ ============
-   anon-ключ публиковать МОЖНО (он публичный по дизайну), но включи RLS (SQL выше).
+   anon-ключ публиковать МОЖНО (он публичный по дизайну), но включи RLS.
    service_role ключ вставлять сюда НЕЛЬЗЯ никогда. */
 const CONFIG = {
   supabaseUrl: 'https://uitjtiujqfypylnjcqsr.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8',
   arriveRadius: 40,
   bonusSeconds: 600,
+  foxRange: 600,          // дальность «приёма» маяка в режиме охоты, м
   cityCenter: [54.6269, 39.7408]
 };
 
@@ -214,11 +238,14 @@ const DEMO = [
  {id:'d10',order:100,kind:'main',title:'Набережная Оки',lat:54.6310,lng:39.7620,desc:'ДЕМО: сколько жизней у кошки по легенде?',answer:'9',hint:'Одна цифра'},
  {id:'b1',order:200,kind:'bonus',title:'Бонус-точка «Альфа»',lat:54.6200,lng:39.7450,desc:'Фрагмент 1',answer:'RYAZAN'},
  {id:'b2',order:210,kind:'bonus',title:'Бонус-точка «Бета»',lat:54.6290,lng:39.7350,desc:'Фрагмент 2',answer:'SKOBELEV'},
- {id:'b3',order:220,kind:'bonus',title:'Бонус-точка «Гамма»',lat:54.6150,lng:39.7500,desc:'Фрагмент 3',answer:'2026'}
+ {id:'b3',order:220,kind:'bonus',title:'Бонус-точка «Гамма»',lat:54.6150,lng:39.7500,desc:'Фрагмент 3',answer:'2026'},
+ {id:'f1',order:300,kind:'foxhunter',title:'Лиса «Альфа»',lat:54.6210,lng:39.7420,radius:25,desc:'ДЕМО-загадка лисы: сколько букв «И» в слове «ЛИСИЦА»?',answer:'2',hint:'Л-И-С-И-Ц-А',comment:'«Лиса» в радиопоиске — не зверь, а передатчик. Настоящая спортивная охота на лис существует с 1920-х и называется ARDF.'},
+ {id:'f2',order:310,kind:'foxhunter',title:'Лиса «Бета»',lat:54.6275,lng:39.7300,radius:25,desc:'ДЕМО-загадка лисы: сколько лис в этом демо-квесте, включая эту?',answer:'2',hint:'Альфа и Бета',comment:'Второй маяк пойман — эфир чист. Хорошей охоты в следующих сценариях!'}
 ];
 
 const $ = id => document.getElementById(id);
-const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null};
+const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null,
+    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -237,8 +264,9 @@ const dirName=d=>DIRS[Math.round(d/45)%8];
 const fmtDist=m=>m<1000?Math.round(m)+' м':(m/1000).toFixed(1)+' км';
 const normAns=s=>(s||'').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 
-const mains=()=>S.quests.filter(q=>q.kind!=='bonus');
+const mains=()=>S.quests.filter(q=>q.kind==='main');
 const bonuses=()=>S.quests.filter(q=>q.kind==='bonus');
+const foxes=()=>S.quests.filter(q=>q.kind==='foxhunter');
 const target=()=>mains().find(q=>!S.opened.has(String(q.id)));
 const mainsDone=()=>mains().length>0&&mains().every(q=>S.opened.has(String(q.id)));
 
@@ -275,11 +303,16 @@ function refreshMarkers(){
 
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
-  if(debugLayer){map.removeLayer(debugLayer);debugLayer=null;}
-  if(!S.debug)return;
+  if(debugLayer){
+   map.removeLayer(debugLayer);
+   debugLayer=null;
+  }
+  if(!S.debug)
+   return;
   debugLayer=L.layerGroup().addTo(map);
   const ms=mains(),bs=bonuses();
-  if(ms.length>1)L.polyline(ms.map(q=>[q.lat,q.lng]),{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
+  if(ms.length>1)
+   L.polyline(ms.map(q=>[q.lat,q.lng]),{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
   S.quests.forEach(q=>{ L.circle([q.lat,q.lng],{radius:q.radius,color:'#00ff66',weight:1,opacity:.45,dashArray:'3 4',fillOpacity:0,interactive:false}).addTo(debugLayer); });
   const mk=(q,label,cls)=>{
     const m=L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg '+cls+(S.delMode?' del':'')+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500,draggable:true})
@@ -290,14 +323,15 @@ function renderDebug(fit){
   };
   ms.forEach((q,i)=>mk(q,i+1,''));
   bs.forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
+  foxes().forEach((q,i)=>mk(q,'Л'+(i+1),'bonus'));
   const all=S.quests.map(q=>[q.lat,q.lng]);
-  if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
+  if(fit&&all.length)
+   map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
 }
- 
 function toggleDebug(){
   S.debug=!S.debug;
   $('btnDebug').classList.toggle('on',S.debug);
-  renderDebug();
+  renderDebug(true);
   toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
 }
 /* ---------- геолокация с честными ошибками ---------- */
@@ -438,6 +472,47 @@ function startGeo(){
     {enableHighAccuracy:true,maximumAge:5000,timeout:30000});
 }
 
+/* ---------- звук охоты (WebAudio) ---------- */
+let audioCtx=null,foxOsc=null,foxGain=null,lastBeepAt=0;
+function ensureAudio(){ try{ if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended')audioCtx.resume(); }catch(e){} }
+function beep(freq,dur,vol){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type='sine';o.frequency.value=freq||880;
+  g.gain.setValueAtTime(0,audioCtx.currentTime);
+  g.gain.linearRampToValueAtTime(vol||0.22,audioCtx.currentTime+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+(dur||0.09));
+  o.connect(g);g.connect(audioCtx.destination);
+  o.start();o.stop(audioCtx.currentTime+(dur||0.09)+0.02);
+}
+function foxContinuous(on){
+  if(on){
+    if(!foxOsc&&audioCtx){
+      foxOsc=audioCtx.createOscillator();foxGain=audioCtx.createGain();
+      foxOsc.type='sine';foxOsc.frequency.value=1250;foxGain.gain.value=0.16;
+      foxOsc.connect(foxGain);foxGain.connect(audioCtx.destination);foxOsc.start();
+    }
+  } else if(foxOsc){ try{foxOsc.stop();}catch(e){} foxOsc.disconnect();foxOsc=null;foxGain=null; }
+}
+function startFoxBeeps(){ ensureAudio(); clearInterval(S.foxTimer); lastBeepAt=0; S.foxTimer=setInterval(foxTick,100); }
+function stopFoxAudio(){ clearInterval(S.foxTimer); S.foxTimer=null; foxContinuous(false); }
+function foxTick(){
+  if(S.mode!=='fox'||!audioCtx)return;
+  if(S.foxQuiz||S.fact){foxContinuous(false);return;}   // тишина, пока читаем загадку/факт
+  if(!S.foxTarget||!S.pos){foxContinuous(false);return;}
+  const q=S.foxTarget,d=S.foxD;
+  if(d<=q.radius){foxContinuous(true);return;}   // «диииииинь» — ты на лисе
+  foxContinuous(false);
+  const t=Math.min(1,d/CONFIG.foxRange);
+  const interval=150+t*t*1850;                    // далеко ~2 c, близко ~0.15 c
+  const now=performance.now();
+  if(now-lastBeepAt>=interval){
+    lastBeepAt=now;
+    if(t>0.75){beep(780,0.07);setTimeout(()=>beep(780,0.07),150);}  // далеко: «дилинь-дидинь»
+    else beep(900+(1-t)*700,0.09);                                  // ближе: одиночные, тон выше
+  }
+}
+
 /* ---------- игровая логика ---------- */
 function updateGame(){
   const ms=mains(),bs=bonuses();
@@ -451,10 +526,67 @@ function updateGame(){
       }
     }
   }
+  /* --- охота на лис: сигнал по дистанции, без компаса --- */
+  const fx=foxes().filter(q=>!S.opened.has(String(q.id)));
+  if(S.mode==='fox'&&S.pos&&fx.length){
+    let best=null,bd=Infinity;
+    for(const q of fx){
+     const d=distM(S.pos[0],S.pos[1],q.lat,q.lng);
+     if(d<bd){
+      bd=d;
+      best=q;
+     }
+    }
+    S.foxTarget=best;
+    S.foxD=bd;
+    const t=Math.min(1,bd/CONFIG.foxRange);
+    const raw=5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);   // шум-пол 5% + рост + джиттер
+    S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;     // сглаживание
+    S.foxHist.push({t:Date.now(),s:S.foxSig});
+    while(S.foxHist.length&&Date.now()-S.foxHist[0].t > 4000)
+     S.foxHist.shift();
+    if(bd<=best.radius&&!S.foxQuiz&&!S.fact){
+      if(!best.answer){
+        /* у лисы нет загадки в базе — ловим сразу (обратная совместимость) */
+        S.opened.add(String(best.id));saveProg();foxContinuous(false);
+        toast('🦊 Лиса «'+best.title+'» поймана! Осталось: '+foxes().filter(q=>!S.opened.has(String(q.id))).length);
+        S.foxTarget=null;S.foxSig=null;S.foxHist=[];
+        if(!foxes().some(q=>!S.opened.has(String(q.id))))
+         $('ovFoxDone').hidden=false;
+      } else {
+        /* лиса в ловушке: сначала загадка */
+        S.foxQuiz=best;foxContinuous(false);
+        toast('🦊 Лиса «'+best.title+'» в ловушке! Отвечай на загадку.');
+      }
+    }
+    renderFox();
+  } else if(S.mode==='fox'){ 
+   S.foxTarget=null; renderFox(); 
+  }
   const rel=S.fact?[]:((S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id))));
   S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
   S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
   renderRadarList();renderCard();refreshMarkers();
+}
+function renderFox(){
+  const done=foxes().filter(q=>S.opened.has(String(q.id))).length,tot=foxes().length;
+  $('foxDone').textContent=done;$('foxTotal').textContent=tot;
+  const tr=$('foxTrend');
+  if(!S.foxTarget){
+    $('foxPct').textContent='--';$('foxBar').style.width='0%';$('foxDbm').textContent='';
+    tr.className='';
+    tr.textContent=!S.pos?'🛰 ждём GPS...':(foxes().some(q=>!S.opened.has(String(q.id)))?'сканирую эфир...':'все лисы пойманы 🎉');
+    return;
+  }
+  const s=Math.max(0,Math.min(100,Math.round(S.foxSig)));
+  $('foxPct').textContent=s;
+  $('foxBar').style.width=s+'%';
+  $('foxDbm').textContent=(-110+Math.round(s*0.7))+' dBm';
+  const old=S.foxHist.length?S.foxHist[0].s:S.foxSig;
+  const diff=S.foxSig-old;
+  if(diff>2){tr.textContent='↑ сигнал растёт — верный путь';tr.className='up';}
+  else if(diff<-2){tr.textContent='↓ сигнал падает — идёшь не туда';tr.className='down';}
+  else{tr.textContent='→ сигнал стабилен';tr.className='';}
 }
 function renderRadarList(){
   const ul=$('radarList');
@@ -469,13 +601,14 @@ function renderFrags(){
 function renderCard(){
   const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
   if(S.phase==='won'){$('card').hidden=true;return;}
+  if(S.mode==='fox'&&!S.foxQuiz){$('card').hidden=true;return;}   // в охоте карточка не нужна, кроме загадки лисы
   $('card').hidden=false;
   if(!S.quests.length){
     $('cardTitle').textContent='🔑 Ждём загрузки квеста';
     $('cardDesc').textContent='Введи кодовое слово в приветственном окне — и маршрут появится на карте.';
     $('cardDist').textContent='';
     bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;fb.hidden=true;return;
-  } 
+  }
   /* --- экран факта после верного ответа --- */
   if(S.fact){
     $('cardTitle').textContent='✅ Правильный ответ!';
@@ -494,13 +627,25 @@ function renderCard(){
     bi.hidden=false;ar.hidden=true;hl.hidden=true;bg.hidden=true;renderFrags();return;
   }
   bi.hidden=true;
+  if(S.mode==='fox'&&S.foxQuiz){
+    const fq=S.foxQuiz;
+    bg.hidden=true;
+    $('cardTitle').textContent='🦊 '+fq.title;
+    $('cardDist').textContent='✅ Лиса в ловушке! Отвечай на загадку.';
+    $('cardDesc').textContent=fq.desc||'';
+    ar.hidden=false;
+    $('answerInput').disabled=false;$('answerBtn').disabled=false;
+    const wq=S.wrong[fq.id]||0;
+    if(wq>=2&&fq.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+fq.hint;}else hl.hidden=true;
+    return;
+  }
   const t=target();
   if(!t){
     $('cardTitle').textContent='🎉 Все основные точки открыты!';
     $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
     $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
   }
-   bg.hidden=true;
+  bg.hidden=true;
   let dTxt;
   if(S.pos){
     const d=distM(S.pos[0],S.pos[1],t.lat,t.lng);
@@ -523,6 +668,21 @@ function renderCard(){
   }
 }
 function submitAnswer(){
+  if(S.foxQuiz){
+    const fq=S.foxQuiz;
+    const v=normAns($('answerInput').value);if(!v)return;
+    const ok=String(fq.answer).split('|').some(a=>normAns(a)===v);
+    if(ok){
+      S.opened.add(String(fq.id));saveProg();S.wrong[fq.id]=0;$('answerInput').value='';
+      S.foxQuiz=null;S.fact=fq;
+      toast('🦊 Лиса «'+fq.title+'» поймана! Осталось: '+foxes().filter(q=>!S.opened.has(String(q.id))).length);
+      updateGame();
+    } else {
+      S.wrong[fq.id]=(S.wrong[fq.id]||0)+1;
+      toast('❌ Неверно! Попытка '+S.wrong[fq.id]);renderCard();
+    }
+    return;
+  }
   const t=target();if(!t||!S.atPoint)return;
   const v=normAns($('answerInput').value);if(!v)return;
   const ok=String(t.answer).split('|').some(a=>normAns(a)===v);
@@ -584,16 +744,20 @@ function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(
 
 /* ---------- режимы, UI ---------- */
 function setMode(m){
-  if(m==='map'&&S.lockRadar){toast('🔒 Карта отключена во время бонус-рейда.');return;}
+  if(S.lockRadar&&m!=='radar'){toast('🔒 Во время бонус-рейда доступен только радар.');return;}
+  if(m==='fox'&&!foxes().some(q=>!S.opened.has(String(q.id)))){toast('🦊 В этом квесте нет лис или все уже пойманы.');return;}
   S.mode=m;
-  $('btnMap').classList.toggle('on',m==='map');$('btnRadar').classList.toggle('on',m==='radar');
-  $('map').hidden=m!=='map';$('radarView').hidden=m!=='radar';
+  $('btnMap').classList.toggle('on',m==='map');
+  $('btnRadar').classList.toggle('on',m==='radar');
+  $('btnFox').classList.toggle('on',m==='fox');
+  $('map').hidden=m!=='map';$('radarView').hidden=m!=='radar';$('foxView').hidden=m!=='fox';
   if(m==='map')setTimeout(()=>map.invalidateSize(),60);
+  if(m==='fox'){ensureAudio();startFoxBeeps();}else{stopFoxAudio();S.foxQuiz=null;}
+  updateGame();
 }
 let toastT;
 function toast(msg,ms=3500){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),ms);}
 
-/* ---------- загрузка квестов из Supabase (fallback: демо) ---------- */
 /* ---------- загрузка: публичный сценарий или секретный по коду ---------- */
 function normalizeRows(src){
   return src.map((r,i)=>({
@@ -606,15 +770,18 @@ function normalizeRows(src){
 function applyScenario(meta, quests, note){
   S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={};
   clearInterval(S.timerId); S.lockRadar=false; $('btnMap').disabled=false;
-  $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true;
+  $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
   S.quests=quests;
+  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;
+  stopFoxAudio();
+  if(S.mode==='fox'){ if(foxes().some(q=>!S.opened.has(String(q.id)))) setMode('fox'); else setMode('map'); }
   document.title='GPS Квест: '+(meta.title||'Рязань');
   $('ttl').textContent='🧭 GPS QUEST'+(meta.title?(': '+meta.title):'');
   const all=S.quests.map(q=>[q.lat,q.lng]);
   if(all.length&&!S.debug){ map.fitBounds(L.latLngBounds(all),{padding:[60,60]}); S.centered=false; }
   if(note)toast(note,8000);
-  updateGame(); renderDebug();
+  updateGame(); renderDebug(true);
   if(!S.quests.length)toast('⚠️ В сценарии нет точек.',12000);
 }
 async function loadByCode(code, silent){
@@ -663,9 +830,12 @@ function prefillCode(){
 loadProg();initMap();
 $('btnMap').onclick=()=>setMode('map');
 $('btnRadar').onclick=()=>setMode('radar');
+$('btnFox').onclick=()=>setMode('fox');
+$('foxExit').onclick=()=>setMode('map');
+$('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;setMode('map');};
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
 $('btnDebug').onclick=toggleDebug;
-$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;updateGame();toast('Прогресс сброшен.');};
+$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
 $('btnStart').onclick=async()=>{
   const code=$('startCode').value.trim();
   if(!code){toast('🔑 Введи кодовое слово квеста');return;}
@@ -678,20 +848,32 @@ $('btnAdd').onclick=()=>{if(!S.debug){toast('Сначала включи 🐞 О
 $('btnDel').onclick=()=>{if(!S.debug){toast('Сначала включи 🐞 Отладку.');return;}S.delMode=!S.delMode;$('btnDel').classList.toggle('on',S.delMode);renderDebug();toast(S.delMode?'➖ Режим удаления: кликни по точке. Ещё раз — выход.':'➖ Режим удаления выключен.');};
 $('edSave').onclick=editorSave;
 $('edDelete').onclick=editorDelete;
-$('edCancel').onclick=()=>{$('ovEdit').hidden=true;S.editing=null;}; 
+$('edCancel').onclick=()=>{$('ovEdit').hidden=true;S.editing=null;};
 $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
 $('btnFailRetry').onclick=startBonus;
 $('btnWinClose').onclick=()=>$('ovWin').hidden=true;
-$('btnFact').onclick=()=>{S.fact=null;updateGame();if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;};
+$('btnFact').onclick=()=>{
+  const wasFox=!!(S.fact&&S.fact.kind==='foxhunter');
+  S.fact=null;
+  if(wasFox){
+    /* после лисьей загадки возвращаемся в основной поток: следующая по порядку точка или бонус */
+    if(!foxes().some(q=>!S.opened.has(String(q.id))))$('ovFoxDone').hidden=false;
+    setMode('map');
+    if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;
+  } else {
+    updateGame();
+    if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;
+  }
+};
 $('btnCode').onclick=()=>{$('ovCode').hidden=false;$('codeInput').value='';};
 $('btnCodeGo').onclick=async()=>{const v=$('codeInput').value.trim();if(!v)return;if(await loadByCode(v,false))$('ovCode').hidden=true;};
 $('codeInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnCodeGo').click();});
 $('btnCodeBack').onclick=()=>{$('ovCode').hidden=true;};
 $('answerBtn').onclick=submitAnswer;
 $('answerInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitAnswer();});
- 
+
 prefillCode();
 requestAnimationFrame(loop);
 </script>
