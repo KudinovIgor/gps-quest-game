@@ -71,6 +71,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .dbg{width:24px;height:24px;border-radius:50%;background:var(--warn);color:#20150a;font-weight:700;font-size:12px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.6)}
 .dbg.bonus{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
+.dbg.story{background:#8ab4f8;color:#0a1420}
 .dbg.stage{width:30px;height:30px;line-height:26px;font-size:13px;background:var(--cy);color:#0326}
 .ed{display:flex;flex-direction:column;gap:6px;text-align:left;max-height:60vh;overflow:auto}
 .ed label{font-size:11px;color:#8ab4d8}
@@ -133,8 +134,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 
 <div id="ovStart" class="overlay"><div class="box">
  <h2>🧭 GPS Квест: Рязань</h2>
- <p>Городской квест-бродилка с загадками. Квест открывается <b>кодовым словом</b> — есть оно у тебя? Введи ниже.<br><br>У точки откроется загадка: ответишь верно — получишь факт о месте и следующую точку. Откроешь все — разблокируется <b>бонус-рейд</b>: 10 минут и только радар, чтобы собрать ключ. А ещё в квесте могут быть <b>лисы</b> — режим 🦊 Охота: ищи маяк по силе сигнала и звуку, без карты.<br><br><i>Геолокация работает по HTTPS или localhost. Дома проверяй через 🧪 Тест. Служебное кодовое слово <b>demo</b> поднимает демо-маршрут без базы.</i></p>
- <input id="startCode" placeholder="Кодовое слово, например BELY-GENERAL-1882" autocomplete="off"
+ <p>Квест-бродилка с загадками. Квест открывается <b>кодовым словом</b>. Введи его ниже.<br><br>У точки откроется загадка: ответишь верно — получишь факт о месте и следующую точку. Откроешь все — разблокируется <b>бонус-рейд</b>: 10 минут и только радар, чтобы собрать ключ. А ещё в квесте могут быть <b>лисы</b> — режим 🦊 Охота: ищи маяк по силе сигнала и звуку, без карты.<br><br><i>Геолокация работает по HTTPS или localhost. Дома проверяй через 🧪 Тест. Служебное кодовое слово <b>demo</b> поднимает демо-маршрут без базы.</i></p>
+ <input id="startCode" placeholder="Кодовое слово" autocomplete="off"
   style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:12px;font-size:16px;margin-top:6px">
  <button id="btnStart">🔑 Ввести и начать</button>
 </div></div>
@@ -202,7 +203,11 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   <button id="edCancel" class="sec">Отмена</button>
  </div>
 </div></div>
-
+<div id="ovStory" class="overlay" hidden><div class="box">
+ <h2 id="storyTitle">📜 История</h2>
+ <p id="storyText" style="white-space:pre-line;text-align:left"></p>
+ <button id="btnStoryNext">➡ Далее</button>
+</div></div>
 <div id="ovFoxDone" class="overlay" hidden><div class="box">
  <h2>🦊 Все лисы пойманы!</h2>
  <p>Ты вычислил все маяки по сигналу и звуку. Охота состоялась!</p>
@@ -246,7 +251,7 @@ const DEMO = [
 
 const $ = id => document.getElementById(id);
 const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null,
-    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null};
+    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -268,7 +273,13 @@ const normAns=s=>(s||'').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').t
 const mains=()=>S.quests.filter(q=>q.kind==='main');
 const bonuses=()=>S.quests.filter(q=>q.kind==='bonus');
 const foxes=()=>S.quests.filter(q=>q.kind==='foxhunter');
-const target=()=>mains().find(q=>!S.opened.has(String(q.id)));
+const stories=()=>S.quests.filter(q=>q.kind==='story');
+const target=()=>{
+ const st=currentStage();
+ if(!st||st.kind!=='main')
+  return undefined;
+ return st.qs.find(q=>!S.opened.has(String(q.id)));
+};
 const mainsDone=()=>mains().length>0&&mains().every(q=>S.opened.has(String(q.id)));
 
 /* ---------- карта (Leaflet + OpenStreetMap, БЕЗ ключей) ---------- */
@@ -328,6 +339,30 @@ function computeStages(){
   }
   return stages;
 }
+
+/* ---------- этапы: гейтинг и презентация ---------- */
+function currentStage(){
+  const ss=computeStages();
+  const i=ss.findIndex(st=>st.qs.some(q=>!S.opened.has(String(q.id))));
+  return i<0?null:Object.assign({idx:i+1},ss[i]);
+}
+function foxStageActive(){const st=currentStage();return !!st&&st.kind==='foxhunter';}
+function foxStageRange(){
+  const st=currentStage();
+  if(!st||st.kind!=='foxhunter')return CONFIG.foxRange;
+  return Math.max(150,st.rM*2);   // компактный этап = чувствительный эфир
+}
+function showStory(q){S.story=q;$('storyTitle').textContent=q.title||'📜 История';$('storyText').textContent=q.desc||'';$('ovStory').hidden=false;}
+function presentStage(){
+  const st=currentStage();
+  if(!st)return;
+  if(st.kind==='story'){ if(!S.story)showStory(st.qs[0]); return; }
+  if(S.story)return;                       // пока карточка открыта, режимы не дёргаем
+  if(foxes().length&&!foxes().some(q=>!S.opened.has(String(q.id)))&&!S.foxDoneShown){S.foxDoneShown=true;$('ovFoxDone').hidden=false;return;}
+  if(st.kind==='foxhunter'){ if(S.mode!=='fox')setMode('fox'); return; }
+  if(st.kind==='bonus'){ $('ovBonus').hidden=false; return; }
+  if(S.mode==='fox')setMode('map');
+} 
  
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
@@ -363,6 +398,7 @@ function renderDebug(fit){
   mains().forEach((q,i)=>mk(q,i+1,''));
   bonuses().forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
   foxes().forEach((q,i)=>mk(q,'Л'+(i+1),'bonus'));
+  stories().forEach((q,i)=>mk(q,'С'+(i+1),'story'));
   const all=S.quests.map(q=>[q.lat,q.lng]);
   if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
 }
@@ -568,8 +604,8 @@ function foxTick(){
   const q=S.foxTarget,d=S.foxD;
   if(d<=q.radius){foxContinuous(true);return;}   // «диииииинь» — ты на лисе
   foxContinuous(false);
-  const t=Math.min(1,d/CONFIG.foxRange);
-  const interval=150+t*t*1850;                    // далеко ~2 c, близко ~0.15 c
+  const t=(S.foxT!=null)?S.foxT:Math.min(1,d/CONFIG.foxRange);
+  const interval=150+t*t*1850;
   const now=performance.now();
   if(now-lastBeepAt>=interval){
     lastBeepAt=now;
@@ -582,7 +618,8 @@ function foxTick(){
 function updateGame(){
   const ms=mains(),bs=bonuses();
   const om=ms.filter(q=>S.opened.has(String(q.id))).length;
-  $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'');
+    const cst=currentStage();
+  $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'')+(cst?' · Э'+cst.idx:'');
   if(S.phase==='bonus'&&S.pos){
     for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
       if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
@@ -604,8 +641,10 @@ function updateGame(){
     }
     S.foxTarget=best;
     S.foxD=bd;
-    const t=Math.min(1,bd/CONFIG.foxRange);
-    const raw=5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);   // шум-пол 5% + рост + джиттер
+    const R=foxStageRange();
+    const t=Math.min(1,Math.max(0,(bd-best.radius)/Math.max(1,R-best.radius)));
+    const raw=(bd<=best.radius)?100:5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);
+    S.foxT=t;
     S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;     // сглаживание
     S.foxHist.push({t:Date.now(),s:S.foxSig});
     while(S.foxHist.length&&Date.now()-S.foxHist[0].t > 4000)
@@ -681,7 +720,7 @@ function renderCard(){
     $('cardDist').textContent='';
     bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;
     fb.hidden=false;
-    fb.textContent=(mainsDone()&&bonuses().length)?'🏆 Дальше: бонус-рейд':'➡ Дальше';
+    fb.textContent='➡ Дальше';
     return;
   }
   fb.hidden=true;
@@ -706,6 +745,12 @@ function renderCard(){
   }
   const t=target();
   if(!t){
+    const st=currentStage();
+    if(st&&st.kind==='foxhunter'){
+      $('cardTitle').textContent='🦊 Идёт лисий этап';
+      $('cardDesc').textContent='Поймай всех лис этапа в режиме 🦊 — маршрут продолжится сам.';
+      $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
+    }
     $('cardTitle').textContent='🎉 Все основные точки открыты!';
     $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
     $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
@@ -837,14 +882,9 @@ function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(
 
 /* ---------- режимы, UI ---------- */
 function setMode(m){
-  if(S.lockRadar&&m!=='radar'){
-   toast('🔒 Во время бонус-рейда доступен только радар.');
-   return;
-  }
-  if(m==='fox'&&!foxes().some(q=>!S.opened.has(String(q.id)))){
-   toast('🦊 В этом квесте нет лис или все уже пойманы.');
-   return;
-  }
+  if(S.lockRadar&&m!=='radar'){toast('🔒 Во время бонус-рейда доступен только радар.');return;}
+  if(foxStageActive()&&!S.debug&&m!=='fox'){toast('🦊 Идёт лисий этап: нельзя выйти, пока не пойманы все лисы. (Кроме 🐞)');return;}
+  if(m==='fox'&&!foxStageActive()&&!(S.debug&&foxes().some(q=>!S.opened.has(String(q.id))))){toast('🦊 Лисий этап ещё не начался.');return;}
   S.mode=m;
   $('btnMap').classList.toggle('on',m==='map');
   $('btnRadar').classList.toggle('on',m==='radar');
@@ -885,7 +925,7 @@ function applyScenario(meta, quests, note){
   $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
   S.quests=quests;
-  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;
+  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;
   stopFoxAudio();
   if(S.mode==='fox'){ if(foxes().some(q=>!S.opened.has(String(q.id)))) setMode('fox'); else setMode('map'); }
   document.title='GPS Квест: '+(meta.title||'Рязань');
@@ -895,6 +935,7 @@ function applyScenario(meta, quests, note){
   if(note)toast(note,8000);
   updateGame(); renderDebug(true);
   if(!S.quests.length)toast('⚠️ В сценарии нет точек.',12000);
+  presentStage();
 }
 async function loadByCode(code, silent){
   if(normAns(code)==='demo'||normAns(code)==='демо'){
@@ -944,7 +985,7 @@ $('btnMap').onclick=()=>setMode('map');
 $('btnRadar').onclick=()=>setMode('radar');
 $('btnFox').onclick=()=>setMode('fox');
 $('foxExit').onclick=()=>setMode('map');
-$('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;setMode('map');};
+$('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;presentStage();};
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
 $('btnDebug').onclick=toggleDebug;
 $('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
@@ -965,19 +1006,13 @@ $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
 $('btnFailRetry').onclick=startBonus;
-$('btnWinClose').onclick=()=>$('ovWin').hidden=true;
-$('btnFact').onclick=()=>{
-  const wasFox=!!(S.fact&&S.fact.kind==='foxhunter');
-  S.fact=null;
-  if(wasFox){
-    /* после лисьей загадки возвращаемся в основной поток: следующая по порядку точка или бонус */
-    if(!foxes().some(q=>!S.opened.has(String(q.id))))$('ovFoxDone').hidden=false;
-    setMode('map');
-    if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;
-  } else {
-    updateGame();
-    if(mainsDone()&&bonuses().length)$('ovBonus').hidden=false;
-  }
+$('btnWinClose').onclick=()=>{$('ovWin').hidden=true;presentStage();};
+$('btnFact').onclick=()=>{S.fact=null;updateGame();presentStage();};
+$('btnStoryNext').onclick=()=>{
+  const q=S.story;if(!q)return;
+  S.story=null;S.opened.add(String(q.id));saveProg();
+  $('ovStory').hidden=true;
+  updateGame();presentStage();
 };
 $('btnCode').onclick=()=>{$('ovCode').hidden=false;$('codeInput').value='';};
 $('btnCodeGo').onclick=async()=>{const v=$('codeInput').value.trim();if(!v)return;if(await loadByCode(v,false))$('ovCode').hidden=true;};
