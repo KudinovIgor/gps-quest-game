@@ -412,24 +412,6 @@ function toggleDebug(){
 /* ---------- отладка: перенос точек с сохранением в БД ---------- */
 async function rpcMove(q, pass){
   try{
-    const r=await fetch(CONFIG.supabaseUrl+'/rest/v1/rpc
-  };
-  mains().forEach((q,i)=>mk(q,i+1,''));
-  bonuses().forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
-  foxes().forEach((q,i)=>mk(q,'Л'+(i+1),'bonus'));
-  stories().forEach((q,i)=>mk(q,'С'+(i+1),'story'));
-  const all=S.quests.map(q=>[q.lat,q.lng]);
-  if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
-}
-function toggleDebug(){
-  S.debug=!S.debug;
-  $('btnDebug').classList.toggle('on',S.debug);
-  renderDebug(true);
-  toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
-}
-/* ---------- отладка: перенос точек с сохранением в БД ---------- */
-async function rpcMove(q, pass){
-  try{
     const r=await fetch(CONFIG.supabaseUrl+'/rest/v1/rpc/move_quest',{method:'POST',
       headers:{apikey:CONFIG.supabaseAnonKey,Authorization:'Bearer '+CONFIG.supabaseAnonKey,'Content-Type':'application/json'},
       body:JSON.stringify({p_id:Number(q.id),p_lat:q.lat,p_lng:q.lng,p_pass:pass})});
