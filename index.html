@@ -71,6 +71,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .dbg{width:24px;height:24px;border-radius:50%;background:var(--warn);color:#20150a;font-weight:700;font-size:12px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.6)}
 .dbg.bonus{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
+.dbg.stage{width:30px;height:30px;line-height:26px;font-size:13px;background:var(--cy);color:#0326}
 .ed{display:flex;flex-direction:column;gap:6px;text-align:left;max-height:60vh;overflow:auto}
 .ed label{font-size:11px;color:#8ab4d8}
 .ed input,.ed select,.ed textarea{background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;width:100%}
@@ -147,7 +148,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 
 <div id="ovWin" class="overlay" hidden><div class="box">
  <h2>🔑 Ключ собран!</h2>
- <p>Ты успел по времени. Ты — легенда Рязани!</p>
+ <p>Ты успела по времени. Ты — легенда!</p>
  <div class="key" id="winKey"></div>
  <p>Покажи этот код хранителю квеста.</p>
  <button id="btnWinClose">Продолжить</button>
@@ -161,8 +162,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 
  <div id="ovCode" class="overlay" hidden><div class="box">
  <h2>🔑 Секретный код</h2>
- <p>Есть код скрытого квеста? Введи его — карта перестроится на новый маршрут.</p>
- <input id="codeInput" placeholder="Например: BELY-GENERAL-1882" autocomplete="off"
+ <p>Есть код квеста? Введи его.</p>
+ <input id="codeInput" placeholder="Например: SECRET_CODE" autocomplete="off"
   style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:10px;font-size:15px;margin-top:6px">
  <button id="btnCodeGo">Войти</button>
  <button id="btnCodeBack" class="sec">Отмена</button>
@@ -312,35 +313,63 @@ function computeStages(){
       stages.push({kind:q.kind, qs:[q]});// иначе открыть новый этап
     }
   }
+  for(let i=0;i<stages.length;i++){      // в JS индексы с нуля!
+    const st=stages[i];
+    st.num=i+1;                          // номер этапа для бейджа Эn
+    if(st.kind==='main')continue;        // цепочкам круг не нужен
+    const lats=st.qs.map(q=>q.lat), lngs=st.qs.map(q=>q.lng);
+    st.centerLat=(Math.min(...lats)+Math.max(...lats))/2;
+    st.centerLng=(Math.min(...lngs)+Math.max(...lngs))/2;
+    st.rM=30;                            // запас метров, растянем ниже
+    for(const q of st.qs){
+      const d=distM(st.centerLat,st.centerLng,q.lat,q.lng);
+      if(d+30>st.rM)st.rM=d+30;          // круг накроет самую дальнюю точку
+    }
+  }
+  return stages;
+}
+
+console.log(minItem); // { name: 'Ручка', price: 50 }
+   };
   return stages;
 }
  
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
-  if(debugLayer){
-   map.removeLayer(debugLayer);
-   debugLayer=null;
-  }
-  if(!S.debug)
-   return;
+  if(debugLayer){map.removeLayer(debugLayer);debugLayer=null;}
+  if(!S.debug)return;
   debugLayer=L.layerGroup().addTo(map);
-  const ms=mains(),bs=bonuses();
-  if(ms.length>1)
-   L.polyline(ms.map(q=>[q.lat,q.lng]),{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
+  const stages=computeStages();
+  const stageOf={};
+  stages.forEach(st=>st.qs.forEach(q=>{stageOf[String(q.id)]=st.num;}));
+  /* пунктир: цепочки по точкам, «пулы» — по центру группы */
+  const verts=[];
+  for(const st of stages){
+    if(st.kind==='main')st.qs.forEach(q=>verts.push([q.lat,q.lng]));
+    else verts.push([st.centerLat,st.centerLng]);
+  }
+  if(verts.length>1)L.polyline(verts,{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
+  /* описывающий круг и бейдж этапа — только для групп */
+  for(const st of stages){
+    if(st.kind==='main'||st.qs.length<2)continue;
+    L.circle([st.centerLat,st.centerLng],{radius:st.rM,color:st.kind==='bonus'?'#c77dff':'#00ff66',weight:1.5,opacity:.7,dashArray:'8 6',fillOpacity:.05,interactive:false}).addTo(debugLayer);
+    L.marker([st.centerLat,st.centerLng],{icon:L.divIcon({className:'',html:'<div class="dbg stage">Э'+st.num+'</div>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:400})
+      .bindTooltip('Э'+st.num+': '+st.kind+' | точек: '+st.qs.length+' | id: '+st.qs.map(q=>q.id).join(','),{direction:'top',offset:[0,-14]})
+      .addTo(debugLayer);
+  }
   S.quests.forEach(q=>{ L.circle([q.lat,q.lng],{radius:q.radius,color:'#00ff66',weight:1,opacity:.45,dashArray:'3 4',fillOpacity:0,interactive:false}).addTo(debugLayer); });
   const mk=(q,label,cls)=>{
     const m=L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg '+cls+(S.delMode?' del':'')+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500,draggable:true})
-      .bindTooltip(label+'. '+q.title+' | sort_order='+q.order+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]})
+      .bindTooltip(label+'. '+q.title+' | Э'+(stageOf[String(q.id)]||'?')+' | sort_order='+q.order+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]})
       .addTo(debugLayer);
     m.on('dragend',()=>{const p=m.getLatLng();q.lat=p.lat;q.lng=p.lng;onQuestMoved(q,label);});
     m.on('click',()=>{ if(S.delMode)delById(q,label); else openEditor(Object.assign({},q)); });
   };
-  ms.forEach((q,i)=>mk(q,i+1,''));
-  bs.forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
+  mains().forEach((q,i)=>mk(q,i+1,''));
+  bonuses().forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
   foxes().forEach((q,i)=>mk(q,'Л'+(i+1),'bonus'));
   const all=S.quests.map(q=>[q.lat,q.lng]);
-  if(fit&&all.length)
-   map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
+  if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
 }
 function toggleDebug(){
   S.debug=!S.debug;
@@ -714,13 +743,17 @@ function submitAnswer(){
     const v=normAns($('answerInput').value);if(!v)return;
     const ok=String(fq.answer).split('|').some(a=>normAns(a)===v);
     if(ok){
-      S.opened.add(String(fq.id));saveProg();S.wrong[fq.id]=0;$('answerInput').value='';
+      S.opened.add(String(fq.id));
+      saveProg();
+      S.wrong[fq.id]=0;
+      $('answerInput').value='';
       S.foxQuiz=null;S.fact=fq;
       toast('🦊 Лиса «'+fq.title+'» поймана! Осталось: '+foxes().filter(q=>!S.opened.has(String(q.id))).length);
       updateGame();
     } else {
       S.wrong[fq.id]=(S.wrong[fq.id]||0)+1;
-      toast('❌ Неверно! Попытка '+S.wrong[fq.id]);renderCard();
+      toast('❌ Неверно! Попытка '+S.wrong[fq.id]);
+      renderCard();
     }
     return;
   }
@@ -745,16 +778,25 @@ function tick(){
   el.classList.toggle('danger',left<60000);
 }
 function startBonus(){
-  S.phase='bonus';S.fact=null;S.lockRadar=true;$('btnMap').disabled=true;setMode('radar');
+  S.phase='bonus';
+  S.fact=null;
+  S.lockRadar=true;
+  $('btnMap').disabled=true;setMode('radar');
   S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
-  clearInterval(S.timerId);S.timerId=setInterval(tick,250);tick();
-  $('ovBonus').hidden=true;$('ovFail').hidden=true;
+  clearInterval(S.timerId);
+  S.timerId=setInterval(tick,250);tick();
+  $('ovBonus').hidden=true;
+  $('ovFail').hidden=true;
   updateGame();toast('⏱ Рейд начался! У тебя 10 минут.');
 }
 function win(){
-  S.phase='won';S.fact=null;clearInterval(S.timerId);S.lockRadar=false;
+  S.phase='won';
+  S.fact=null;
+  clearInterval(S.timerId);
+  S.lockRadar=false;
   $('winKey').textContent=bonuses().map(q=>q.answer).join('-');
-  $('ovWin').hidden=false;updateGame();
+  $('ovWin').hidden=false;
+  updateGame();
 }
 function fail(){clearInterval(S.timerId);$('ovFail').hidden=false;}
 
@@ -767,16 +809,31 @@ function drawRadar(ts){
   const c=cv.getContext('2d');c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);
   const cx=w/2,cy=h/2,R=Math.min(w,h)/2-6;
   c.strokeStyle='rgba(0,229,255,.25)';c.fillStyle='rgba(0,229,255,.55)';c.font='10px monospace';
-  for(let i=1;i<=3;i++){c.beginPath();c.arc(cx,cy,R*i/3,0,7);c.stroke();c.fillText(fmtDist(S.maxRange*i/3),cx+4,cy-R*i/3+11);}
+  for(let i=1;i<=3;i++){
+   c.beginPath();
+   c.arc(cx,cy,R*i/3,0,7);
+   c.stroke();
+   c.fillText(fmtDist(S.maxRange*i/3),cx+4,cy-R*i/3+11);
+  }
   const sa=(ts/2600)%(Math.PI*2);
-  for(let i=0;i<24;i++){const a=sa-i*0.02;c.strokeStyle='rgba(0,255,102,'+(0.25*(1-i/24)).toFixed(3)+')';c.beginPath();c.moveTo(cx,cy);c.lineTo(cx+R*Math.sin(a),cy-R*Math.cos(a));c.stroke();}
+  for(let i=0;i<24;i++){
+   const a=sa-i*0.02;
+   c.strokeStyle='rgba(0,255,102,'+(0.25*(1-i/24)).toFixed(3)+')';
+   c.beginPath();
+   c.moveTo(cx,cy);
+   c.lineTo(cx+R*Math.sin(a),cy-R*Math.cos(a));
+   c.stroke();
+  }
   for(const b of S.blips){
     const r=b.d/S.maxRange*R;if(r>R)continue;
     const br=b.b*Math.PI/180,x=cx+r*Math.sin(br),y=cy-r*Math.cos(br);
-    let df=Math.abs(sa-br)%(Math.PI*2);df=Math.min(df,Math.PI*2-df);
+    let df=Math.abs(sa-br)%(Math.PI*2);
+    df=Math.min(df,Math.PI*2-df);
     const glow=Math.exp(-df*df/0.15);
     c.fillStyle='rgba(0,255,102,'+(0.35+0.65*glow).toFixed(2)+')';
-    c.beginPath();c.arc(x,y,5+3*glow,0,7);c.fill();
+    c.beginPath();
+    c.arc(x,y,5+3*glow,0,7);
+    c.fill();
   }
   c.fillStyle='#4fc3f7';c.beginPath();c.arc(cx,cy,5,0,7);c.fill();
   if(!S.pos){c.fillStyle='rgba(255,200,87,.9)';c.font='13px monospace';c.textAlign='center';c.fillText('Поиск спутников...',cx,cy-14);c.fillText('(или включи 🧪 и кликни по карте)',cx,cy+26);c.textAlign='left';}
@@ -785,19 +842,38 @@ function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(
 
 /* ---------- режимы, UI ---------- */
 function setMode(m){
-  if(S.lockRadar&&m!=='radar'){toast('🔒 Во время бонус-рейда доступен только радар.');return;}
-  if(m==='fox'&&!foxes().some(q=>!S.opened.has(String(q.id)))){toast('🦊 В этом квесте нет лис или все уже пойманы.');return;}
+  if(S.lockRadar&&m!=='radar'){
+   toast('🔒 Во время бонус-рейда доступен только радар.');
+   return;
+  }
+  if(m==='fox'&&!foxes().some(q=>!S.opened.has(String(q.id)))){
+   toast('🦊 В этом квесте нет лис или все уже пойманы.');
+   return;
+  }
   S.mode=m;
   $('btnMap').classList.toggle('on',m==='map');
   $('btnRadar').classList.toggle('on',m==='radar');
   $('btnFox').classList.toggle('on',m==='fox');
-  $('map').hidden=m!=='map';$('radarView').hidden=m!=='radar';$('foxView').hidden=m!=='fox';
+  $('map').hidden=m!=='map';
+  $('radarView').hidden=m!=='radar';
+  $('foxView').hidden=m!=='fox';
   if(m==='map')setTimeout(()=>map.invalidateSize(),60);
-  if(m==='fox'){ensureAudio();startFoxBeeps();}else{stopFoxAudio();S.foxQuiz=null;}
+  if(m==='fox'){
+   ensureAudio();
+   startFoxBeeps();
+  }else{
+   stopFoxAudio();
+   S.foxQuiz=null;
+  }
   updateGame();
 }
 let toastT;
-function toast(msg,ms=3500){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),ms);}
+function toast(msg,ms=3500){
+ const el=$('toast');
+ el.textContent=msg;el.classList.add('show');
+ clearTimeout(toastT);
+ toastT=setTimeout(()=>el.classList.remove('show'),ms);
+}
 
 /* ---------- загрузка: публичный сценарий или секретный по коду ---------- */
 function normalizeRows(src){
