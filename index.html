@@ -72,7 +72,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .dbg.bonus{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
 .dbg.story{background:#8ab4f8;color:#0a1420}
-.dbg.stage{width:30px;height:30px;line-height:26px;font-size:13px;background:var(--cy);color:#0326}
+.dbg.stage{width:30px;height:30px;line-height:26px;font-size:13px;background:var(--cy);color:#032}
 .ed{display:flex;flex-direction:column;gap:6px;text-align:left;max-height:60vh;overflow:auto}
 .ed label{font-size:11px;color:#8ab4d8}
 .ed input,.ed select,.ed textarea{background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;width:100%}
@@ -195,7 +195,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   <div><label>Комментарий-факт после верного ответа</label><textarea id="edComment" rows="2"></textarea></div>
   <div class="row">
    <div><label>Порядок</label><input id="edOrder" inputmode="numeric"></div>
-   <div><label>Тип</label><select id="edKind"><option value="main">main</option><option value="bonus">bonus</option><option value="foxhunter">foxhunter</option></select></div>
+   <div><label>Тип</label><select id="edKind"><option value="main">main</option><option value="bonus">bonus</option><option value="foxhunter">foxhunter</option><option value="story">story</option></select></div>
    <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
   </div>
   <button id="edSave">💾 Сохранить в БД</button>
@@ -390,10 +390,29 @@ function renderDebug(fit){
   S.quests.forEach(q=>{ L.circle([q.lat,q.lng],{radius:q.radius,color:'#00ff66',weight:1,opacity:.45,dashArray:'3 4',fillOpacity:0,interactive:false}).addTo(debugLayer); });
   const mk=(q,label,cls)=>{
     const m=L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="dbg '+cls+(S.delMode?' del':'')+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),zIndexOffset:500,draggable:true})
-      .bindTooltip(label+'. '+q.title+' | Э'+(stageOf[String(q.id)]||'?')+' | sort_order='+q.order+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]})
+      .bindTooltip(label+'. '+q.title+' | sort_order='+q.order+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]})
       .addTo(debugLayer);
     m.on('dragend',()=>{const p=m.getLatLng();q.lat=p.lat;q.lng=p.lng;onQuestMoved(q,label);});
     m.on('click',()=>{ if(S.delMode)delById(q,label); else openEditor(Object.assign({},q)); });
+  };
+  const ms=mains(),bs=bonuses(),fx=foxes(),sts=stories();
+  ms.forEach((q,i)=>mk(q,i+1,''));
+  bs.forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
+  fx.forEach((q,i)=>mk(q,'Л'+(i+1),'bonus'));
+  sts.forEach((q,i)=>mk(q,'С'+(i+1),'story'));
+  const all=S.quests.map(q=>[q.lat,q.lng]);
+  if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
+}
+function toggleDebug(){
+  S.debug=!S.debug;
+  $('btnDebug').classList.toggle('on',S.debug);
+  renderDebug(true);
+  toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
+}
+/* ---------- отладка: перенос точек с сохранением в БД ---------- */
+async function rpcMove(q, pass){
+  try{
+    const r=await fetch(CONFIG.supabaseUrl+'/rest/v1/rpc
   };
   mains().forEach((q,i)=>mk(q,i+1,''));
   bonuses().forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
@@ -408,7 +427,6 @@ function toggleDebug(){
   renderDebug(true);
   toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
 }
-/* ---------- геолокация с честными ошибками ---------- */
 /* ---------- отладка: перенос точек с сохранением в БД ---------- */
 async function rpcMove(q, pass){
   try{
