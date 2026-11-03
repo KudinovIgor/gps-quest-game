@@ -304,13 +304,13 @@ function refreshMarkers(){
 /* ---------- функция группировки заданий ---------- */
 function computeStages(){
   const stages=[];
-  for(const q of S.quests){           // S.quests уже отсортированы по sort_order
-    const last=stages[stages.length-1];
-    if(last && /* q подходит в текущую группу? */){ 
-     /* добавить q в last.qs */ 
+  for(const q of S.quests){              // уже отсортированы по sort_order
+    const last=stages[stages.length-1];  // «стопка на столе»
+    if(last && last.kind===q.kind){
+      last.qs.push(q);                   // подходит в открытый этап
+    } else {
+      stages.push({kind:q.kind, qs:[q]});// иначе открыть новый этап
     }
-    else {
-     stages.push({kind:q.kind, qs:[q]});
   }
   return stages;
 }
