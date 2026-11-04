@@ -72,6 +72,9 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .dbg.bonus{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
 .dbg.story{background:#8ab4f8;color:#0a1420}
+.done{width:22px;height:22px;border-radius:50%;background:var(--gr);color:#fff;font-size:13px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.5)}
+.dirArrow{width:30px;height:30px;position:relative;transform-origin:50% 50%}
+.dirArrow::before{content:'';position:absolute;left:50%;top:-3px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid #4fc3f7;filter:drop-shadow(0 0 3px rgba(79,195,247,.9))} 
 .dbg.stage{width:30px;height:30px;line-height:26px;font-size:13px;background:var(--cy);color:#032}
 .ed{display:flex;flex-direction:column;gap:6px;text-align:left;max-height:60vh;overflow:auto}
 .ed label{font-size:11px;color:#8ab4d8}
@@ -283,7 +286,7 @@ const target=()=>{
 const mainsDone=()=>mains().length>0&&mains().every(q=>S.opened.has(String(q.id)));
 
 /* ---------- карта (Leaflet + OpenStreetMap, БЕЗ ключей) ---------- */
-let map,userMark,accCircle,targetMark,openedLayer,debugLayer=null,zoneCircle;
+let map,userMark,accCircle,targetMark,openedLayer,debugLayer=null,zoneCircle,dirMark;
 const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[36,36],iconAnchor:[18,18]});
 function initMap(){
   map=L.map('map',{zoomControl:true}).setView(CONFIG.cityCenter,13);
@@ -294,6 +297,7 @@ function initMap(){
   openedLayer=L.layerGroup().addTo(map);
   targetMark=L.marker([0,0],{icon:pulseIcon,interactive:false,opacity:0}).addTo(map);
   zoneCircle=L.circle([0,0],{radius:CONFIG.arriveRadius,color:'#00e5ff',weight:1.5,dashArray:'5 5',fillColor:'#00e5ff',fillOpacity:0,opacity:0,interactive:false}).addTo(map);
+  dirMark=L.marker([0,0],{icon:L.divIcon({className:'',html:'<div class="dirArrow"></div>',iconSize:[30,30],iconAnchor:[15,15]}),interactive:false,opacity:0,zIndexOffset:350}).addTo(map);
   map.on('click',e=>{ if(S.testMode&&S.started){ setPos(e.latlng.lat,e.latlng.lng,5); toast('🧪 Телепорт: '+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)); } });
 }
 function refreshMarkers(){
@@ -307,10 +311,38 @@ function refreshMarkers(){
   } else {
     targetMark.setOpacity(0); zoneCircle.setStyle({opacity:0,fillOpacity:0});
   }
+  /* --- взятые точки: зелёные галочки + трейл в порядке взятия --- */
   openedLayer.clearLayers();
-  S.quests.filter(q=>S.opened.has(String(q.id))).forEach(q=>{
-    L.circleMarker([q.lat,q.lng],{radius:6,color:'#7a8ba3',weight:1,fillColor:'#33506a',fillOpacity:1}).bindTooltip(q.title).addTo(openedLayer);
+  const openedQs=[...S.opened]                      // Set помнит порядок добавления = порядок взятия!
+    .map(id=>S.quests.find(q=>String(q.id)===String(id)))
+    .filter(q=>q&&q.kind!=='story');                // у story координаты-заглушки, не рисуем
+  openedQs.forEach(q=>{
+    L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="done">✓</div>',iconSize:[22,22],iconAnchor:[11,11]}),interactive:false,zIndexOffset:200})
+      .bindTooltip(q.title,{direction:'top',offset:[0,-10]})
+      .addTo(openedLayer);
   });
+  const trail=kind=>openedQs.filter(q=>q.kind===kind).map(q=>[q.lat,q.lng]);
+  const tMain=trail('main'), tFox=trail('foxhunter');
+  if(tMain.length>1)L.polyline(tMain,{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
+  if(tFox.length>1)L.polyline(tFox,{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
+  /* --- стрелка направления на следующую цель --- */
+  let at=null;
+  const cst=currentStage();
+  if(cst&&cst.kind==='main')at=target();
+  else if(S.phase==='bonus'){
+    let bd=Infinity;
+    for(const q of bonuses().filter(q=>!S.opened.has(String(q.id)))){
+      const d=S.pos?distM(S.pos[0],S.pos[1],q.lat,q.lng):Infinity;
+      if(d<bd){bd=d;at=q;}
+    }
+  }                                                // в лисьем этапе стрелки нет: охота на слух
+  if(at&&S.pos){
+    dirMark.setLatLng(S.pos);
+    const b=bearing(S.pos[0],S.pos[1],at.lat,at.lng);
+    const el=dirMark.getElement();
+    if(el&&el.firstElementChild)el.firstElementChild.style.transform='rotate('+b.toFixed(1)+'deg)';
+    dirMark.setOpacity(1);
+  } else dirMark.setOpacity(0);
 }
 
 /* ---------- функция группировки заданий ---------- */
