@@ -341,8 +341,14 @@ function computeStages(){
 }
 
 /* ---------- этапы: гейтинг и презентация ---------- */
+let cachedStages=null;
+function invalidateStages(){ cachedStages=null; }
+function getStages(){
+  if(!cachedStages) cachedStages=computeStages();
+  return cachedStages;
+}
 function currentStage(){
-  const ss=computeStages();
+  const ss=getStages();
   const i=ss.findIndex(st=>st.qs.some(q=>!S.opened.has(String(q.id))));
   return i<0?null:Object.assign({idx:i+1},ss[i]);
 }
@@ -485,6 +491,7 @@ function openEditor(q){
   $('ovEdit').hidden=false;
 }
 async function editorSave(){
+  invalidateStages();
   const d=S.editing;if(!d)return;
   const title=$('edTitle').value.trim();
   const lat=parseFloat($('edLat').value),lng=parseFloat($('edLng').value);
@@ -703,16 +710,14 @@ function renderFrags(){
   $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?q.answer:'???')+'</span>';}).join('');
 }
 function renderCard(){
-  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
-  if(S.phase==='won'){$('card').hidden=true;return;}
-  if(S.mode==='fox'&&!S.foxQuiz){$('card').hidden=true;return;}   // в охоте карточка не нужна, кроме загадки лисы
-  $('card').hidden=false;
   if(!S.quests.length){
     $('cardTitle').textContent='🔑 Ждём загрузки квеста';
     $('cardDesc').textContent='Введи кодовое слово в приветственном окне — и маршрут появится на карте.';
     $('cardDist').textContent='';
     bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;fb.hidden=true;return;
   }
+  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
+  if(S.phase==='won'){$('card').hidden=true;return;}
   /* --- экран факта после верного ответа --- */
   if(S.fact){
     $('cardTitle').textContent='✅ Правильный ответ!';
@@ -722,7 +727,9 @@ function renderCard(){
     fb.hidden=false;
     fb.textContent='➡ Дальше';
     return;
-  }
+  } 
+  if(S.mode==='fox'&&!S.foxQuiz){$('card').hidden=true;return;}   // в охоте карточка не нужна, кроме загадки лисы
+  $('card').hidden=false;
   fb.hidden=true;
   if(S.phase==='bonus'){
     $('cardTitle').textContent='🔑 Бонус-рейд: собери фрагменты!';
@@ -784,6 +791,7 @@ function submitAnswer(){
     const ok=String(fq.answer).split('|').some(a=>normAns(a)===v);
     if(ok){
       S.opened.add(String(fq.id));
+      invalidateStages();
       saveProg();
       S.wrong[fq.id]=0;
       $('answerInput').value='';
@@ -920,6 +928,7 @@ function normalizeRows(src){
   })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
 }
 function applyScenario(meta, quests, note){
+  invalidateStages();
   S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={};
   clearInterval(S.timerId); S.lockRadar=false; $('btnMap').disabled=false;
   $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
