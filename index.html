@@ -100,7 +100,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
    <button id="btnRadar">📡 Радар</button>
    <button id="btnFox">🦊 Охота</button>
   </div>
-  <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт">🧪 Тест</button>
+  <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт" hidden>🧪 Тест</button>
   <button id="btnDebug" class="chip" title="Отладка: номера точек и связи маршрута">🐞 Отладка</button>
   <button id="btnAdd" class="chip" title="Добавить точку (в режиме отладки)" hidden>➕</button>
   <button id="btnDel" class="chip" title="Режим удаления: клик по точке (в отладке)" hidden>➖</button>
@@ -483,6 +483,7 @@ function toggleDebug(){
   $('segModes').hidden=!S.debug;
   $('btnAdd').hidden=!S.debug;
   $('btnDel').hidden=!S.debug;
+  $('btnTest').hidden=!S.debug;
   renderDebug(true);
   toast(S.debug?'🐞 Отладка ВКЛ: номера, связи, переключение режимов и ➕➖ доступны.':'🐞 Отладка ВЫКЛ');
 }
@@ -781,13 +782,13 @@ function renderFrags(){
   $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?(q.fragment||q.title):'???')+'</span>';}).join('');
 }
 function renderCard(){
+  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact'); 
   if(!S.quests.length){
     $('cardTitle').textContent='🔑 Ждём загрузки квеста';
     $('cardDesc').textContent='Введи кодовое слово в приветственном окне — и маршрут появится на карте.';
     $('cardDist').textContent='';
     bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;fb.hidden=true;return;
   }
-  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
   if(S.phase==='won'){$('card').hidden=true;return;}
   /* --- экран факта после верного ответа --- */
   if(S.fact){
@@ -923,7 +924,7 @@ function startBonus(){
   S.fact=null;
   S.bonusQuiz=null
   S.lockRadar=true;
-  $('btnMap').disabled=true;setMode('radar');
+  setMode('radar');
   S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
   clearInterval(S.timerId);
   S.timerId=setInterval(tick,250);tick();
