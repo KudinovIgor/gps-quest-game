@@ -263,7 +263,7 @@ const DEMO = [
 
 const $ = id => document.getElementById(id);
 const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null,
-    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null};
+    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null,shownQid:null};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -782,7 +782,15 @@ function renderFrags(){
   $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?(q.fragment||q.title):'???')+'</span>';}).join('');
 }
 function renderCard(){
-  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact'); 
+  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo'),fb=$('btnFact');
+  let qid=null;
+  if(S.foxQuiz)qid='F'+S.foxQuiz.id;
+  else if(S.bonusQuiz)qid='B'+S.bonusQuiz.id;
+  else if(S.mode!=='fox'&&S.phase!=='bonus'){
+    const tt=target();
+    if(tt&&S.pos&&distM(S.pos[0],S.pos[1],tt.lat,tt.lng)<=tt.radius)qid='M'+tt.id;
+  }
+  if(qid!==S.shownQid){ $('answerInput').value=''; S.shownQid=qid; }   // новый вопрос — чистое поле 
   if(!S.quests.length){
     $('cardTitle').textContent='🔑 Ждём загрузки квеста';
     $('cardDesc').textContent='Введи кодовое слово в приветственном окне — и маршрут появится на карте.';
@@ -1037,7 +1045,7 @@ function applyScenario(meta, quests, note){
   $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
   S.quests=quests;
-  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;S.bonusQuiz=null;S.foxSel=null;
+  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;S.bonusQuiz=null;S.foxSel=null;S.shownQid=null;
   stopFoxAudio();
   if(S.mode==='fox'){ if(foxes().some(q=>!S.opened.has(String(q.id)))) setMode('fox'); else setMode('map'); }
   document.title='GPS Квест: '+(meta.title||'Рязань');
