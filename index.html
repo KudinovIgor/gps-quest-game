@@ -328,10 +328,7 @@ function refreshMarkers(){
       .bindTooltip(q.title,{direction:'top',offset:[0,-10]})
       .addTo(openedLayer);
   });
-  const trail=kind=>openedQs.filter(q=>q.kind===kind).map(q=>[q.lat,q.lng]);
-  const tMain=trail('main'), tFox=trail('foxhunter');
-  if(tMain.length>1)L.polyline(tMain,{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
-  if(tFox.length>1)L.polyline(tFox,{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
+  if(openedQs.length>1)L.polyline(openedQs.map(q=>[q.lat,q.lng]),{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
   /* --- стрелка направления на следующую цель --- */
   let at=null;
   const cst=currentStage();
