@@ -705,8 +705,8 @@ function foxTick(){
 function updateGame(){
   const ms=mains(),bs=bonuses();
   const om=ms.filter(q=>S.opened.has(String(q.id))).length;
-    const cst=currentStage();
-  $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'')+(cst?' · Э'+cst.idx:'');
+  const cst=currentStage();
+  $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'')+(S.debug&&cst?' · Э'+cst.idx:'');
   const mst=$('modeStatus');
   if(S.phase==='won')mst.textContent='🏁 Квест завершён!';
   else if(S.story)mst.textContent='📜 Страница истории';
@@ -717,7 +717,7 @@ function updateGame(){
   else if(cst&&cst.kind==='foxhunter')mst.textContent='🦊 Охота на лис: поймано '+foxes().filter(q=>S.opened.has(String(q.id))).length+'/'+foxes().length;
   else if(cst&&cst.kind==='bonus')mst.textContent='📡 Бонус-рейд доступен — начни, когда готов';
   else if(cst)mst.textContent='🗺 Маршрут: этап Э'+cst.idx;
-  else mst.textContent=''; 
+  else mst.textContent=S.quests.length?'🏁 Весь маршрут пройден!':'';
   if(S.phase==='bonus'&&S.pos&&!S.bonusQuiz&&!S.fact){
     for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
       if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
@@ -1126,7 +1126,7 @@ $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
 $('btnFailRetry').onclick=startBonus;
-$('btnWinClose').onclick=()=>{$('ovWin').hidden=true;presentStage();};
+$('btnWinClose').onclick=()=>{$('ovWin').hidden=true;S.phase='main';presentStage();};
 $('btnFact').onclick=()=>{S.fact=null;updateGame();presentStage();};
 $('btnStoryNext').onclick=()=>{
   const q=S.story;if(!q)return;
