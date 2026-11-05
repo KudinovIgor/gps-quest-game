@@ -23,6 +23,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .seg button:disabled{opacity:.4;cursor:not-allowed}
 #geoStatus{padding:4px 10px;font-size:12px;background:#0a1a2a;border-bottom:1px solid #16324a}
 #geoStatus.ok{color:var(--gr)}#geoStatus.wait{color:var(--warn)}#geoStatus.err{color:var(--err)}
+#modeStatus{padding:4px 10px;font-size:12px;background:#0a1a2a;border-bottom:1px solid #16324a;color:var(--txt)}
 #views{position:relative;flex:1;min-height:0}
 #map{position:absolute;inset:0}
 .leaflet-control-attribution{font-size:9px;opacity:.6}
@@ -94,19 +95,20 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
  <header>
   <div class="ttl" id="ttl">🧭 GPS QUEST</div>
   <div id="progress" class="chip" style="cursor:default">🚩 0/0</div>
-  <div class="seg">
+  <div class="seg" id="segModes" hidden>
    <button id="btnMap" class="on">🗺 Карта</button>
    <button id="btnRadar">📡 Радар</button>
    <button id="btnFox">🦊 Охота</button>
   </div>
   <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт">🧪 Тест</button>
   <button id="btnDebug" class="chip" title="Отладка: номера точек и связи маршрута">🐞 Отладка</button>
-  <button id="btnAdd" class="chip" title="Добавить точку (в режиме отладки)">➕</button>
-  <button id="btnDel" class="chip" title="Режим удаления: клик по точке (в отладке)">➖</button>
+  <button id="btnAdd" class="chip" title="Добавить точку (в режиме отладки)" hidden>➕</button>
+  <button id="btnDel" class="chip" title="Режим удаления: клик по точке (в отладке)" hidden>➖</button>
   <button id="btnCode" class="chip" title="Ввести код">🔑 Код</button>
   <button id="btnReset" class="chip" title="Сбросить прогресс">⟲</button>
  </header>
  <div id="geoStatus" class="wait">🛰 Геолокация ещё не запрошена.</div>
+ <div id="modeStatus"></div>
  <div id="views">
   <div id="map"></div>
   <div id="radarView" hidden>
@@ -220,7 +222,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 </div></div>
 <div id="ovFoxDone" class="overlay" hidden><div class="box">
  <h2>🦊 Все лисы пойманы!</h2>
- <p>Ты вычислил все маяки по сигналу и звуку. Охота состоялась!</p>
+ <p>Маяки по звуку найдены. Охота на лис состоялась!</p>
  <button id="btnFoxDoneClose">Продолжить</button>
 </div></div>
 
@@ -403,7 +405,7 @@ function presentStage(){
   if(foxes().length&&!foxes().some(q=>!S.opened.has(String(q.id)))&&!S.foxDoneShown){S.foxDoneShown=true;$('ovFoxDone').hidden=false;return;}
   if(st.kind==='foxhunter'){ if(S.mode!=='fox')setMode('fox'); return; }
   if(st.kind==='bonus'){ if(S.phase!=='bonus')$('ovBonus').hidden=false; return; }
-  if(S.mode==='fox')setMode('map');
+  if(S.mode!=='map')setMode('map');
 } 
 function foxStageQuests(){
   const st=currentStage();
@@ -478,8 +480,11 @@ function renderDebug(fit){
 function toggleDebug(){
   S.debug=!S.debug;
   $('btnDebug').classList.toggle('on',S.debug);
+  $('segModes').hidden=!S.debug;
+  $('btnAdd').hidden=!S.debug;
+  $('btnDel').hidden=!S.debug;
   renderDebug(true);
-  toast(S.debug?'🐞 Отладка ВКЛ: номера точек и связи маршрута. Нажми ещё раз, чтобы скрыть.':'🐞 Отладка ВЫКЛ');
+  toast(S.debug?'🐞 Отладка ВКЛ: номера, связи, переключение режимов и ➕➖ доступны.':'🐞 Отладка ВЫКЛ');
 }
 /* ---------- отладка: перенос точек с сохранением в БД ---------- */
 async function rpcMove(q, pass){
@@ -701,6 +706,17 @@ function updateGame(){
   const om=ms.filter(q=>S.opened.has(String(q.id))).length;
     const cst=currentStage();
   $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'')+(cst?' · Э'+cst.idx:'');
+  const mst=$('modeStatus');
+  if(S.phase==='won')mst.textContent='🏁 Квест завершён!';
+  else if(S.story)mst.textContent='📜 Страница истории';
+  else if(S.fact)mst.textContent='✅ Загадка решена — читай факт';
+  else if(S.foxQuiz)mst.textContent='🦊 Лиса в ловушке — загадка!';
+  else if(S.bonusQuiz)mst.textContent='🔎 Бонусная точка — загадка!';
+  else if(S.phase==='bonus')mst.textContent='📡 Бонус-рейд: работаем по радару';
+  else if(cst&&cst.kind==='foxhunter')mst.textContent='🦊 Охота на лис: поймано '+foxes().filter(q=>S.opened.has(String(q.id))).length+'/'+foxes().length;
+  else if(cst&&cst.kind==='bonus')mst.textContent='📡 Бонус-рейд доступен — начни, когда готов';
+  else if(cst)mst.textContent='🗺 Маршрут: этап Э'+cst.idx;
+  else mst.textContent=''; 
   if(S.phase==='bonus'&&S.pos&&!S.bonusQuiz&&!S.fact){
     for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
       if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
@@ -973,7 +989,7 @@ function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(
 
 /* ---------- режимы, UI ---------- */
 function setMode(m){
-  if(S.lockRadar&&m!=='radar'){toast('🔒 Во время бонус-рейда доступен только радар.');return;}
+  if(S.lockRadar&&m!=='radar'&&!S.debug){toast('🔒 Во время бонус-рейда доступен только радар. (Кроме 🐞)');return;}
   if(foxStageActive()&&!S.debug&&m!=='fox'){toast('🦊 Идёт лисий этап: нельзя выйти, пока не пойманы все лисы. (Кроме 🐞)');return;}
   if(m==='fox'&&!foxStageActive()&&!(S.debug&&foxes().some(q=>!S.opened.has(String(q.id))))){toast('🦊 Лисий этап ещё не начался.');return;}
   S.mode=m;
