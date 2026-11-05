@@ -245,16 +245,16 @@ const DEMO = [
  {id:'d8',order:80,kind:'main',title:'Театральная площадь',lat:54.6269,lng:39.7441,desc:'ДЕМО: сколько пальцев на одной руке?',answer:'5',hint:'Вместе с большим'},
  {id:'d9',order:90,kind:'main',title:'Вокзал Рязань-1',lat:54.6397,lng:39.7282,desc:'ДЕМО: сколько килограммов в тонне?',answer:'1000',hint:'Три нуля'},
  {id:'d10',order:100,kind:'main',title:'Набережная Оки',lat:54.6310,lng:39.7620,desc:'ДЕМО: сколько жизней у кошки по легенде?',answer:'9',hint:'Одна цифра'},
- {id:'b1',order:200,kind:'bonus',title:'Бонус-точка «Альфа»',lat:54.6200,lng:39.7450,desc:'Фрагмент 1',answer:'RYAZAN'},
- {id:'b2',order:210,kind:'bonus',title:'Бонус-точка «Бета»',lat:54.6290,lng:39.7350,desc:'Фрагмент 2',answer:'SKOBELEV'},
- {id:'b3',order:220,kind:'bonus',title:'Бонус-точка «Гамма»',lat:54.6150,lng:39.7500,desc:'Фрагмент 3',answer:'2026'},
+ {id:'b1',order:200,kind:'bonus',title:'Бонус-точка «Альфа»',lat:54.6200,lng:39.7450,desc:'ДЕМО-загадка бонуса: сколько бонусных точек в этом рейде?',answer:'3',hint:'Посчитай фрагменты ключа',fragment:'RYAZAN',comment:'Первый фрагмент у тебя. Остальные две — без загадок, просто беги.'},
+ {id:'b2',order:210,kind:'bonus',title:'Бонус-точка «Бета»',lat:54.6290,lng:39.7350,desc:'',answer:'',fragment:'SKOBELEV'},
+ {id:'b3',order:220,kind:'bonus',title:'Бонус-точка «Гамма»',lat:54.6150,lng:39.7500,desc:'',answer:'',fragment:'2026'}
  {id:'f1',order:300,kind:'foxhunter',title:'Лиса «Альфа»',lat:54.6210,lng:39.7420,radius:25,desc:'ДЕМО-загадка лисы: сколько букв «И» в слове «ЛИСИЦА»?',answer:'2',hint:'Л-И-С-И-Ц-А',comment:'«Лиса» в радиопоиске — не зверь, а передатчик. Настоящая спортивная охота на лис существует с 1920-х и называется ARDF.'},
  {id:'f2',order:310,kind:'foxhunter',title:'Лиса «Бета»',lat:54.6275,lng:39.7300,radius:25,desc:'ДЕМО-загадка лисы: сколько лис в этом демо-квесте, включая эту?',answer:'2',hint:'Альфа и Бета',comment:'Второй маяк пойман — эфир чист. Хорошей охоты в следующих сценариях!'}
 ];
 
 const $ = id => document.getElementById(id);
 const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null,
-    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false};
+    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -398,7 +398,7 @@ function presentStage(){
   if(S.story)return;                       // пока карточка открыта, режимы не дёргаем
   if(foxes().length&&!foxes().some(q=>!S.opened.has(String(q.id)))&&!S.foxDoneShown){S.foxDoneShown=true;$('ovFoxDone').hidden=false;return;}
   if(st.kind==='foxhunter'){ if(S.mode!=='fox')setMode('fox'); return; }
-  if(st.kind==='bonus'){ $('ovBonus').hidden=false; return; }
+  if(st.kind==='bonus'){ if(S.phase!=='bonus')$('ovBonus').hidden=false; return; }
   if(S.mode==='fox')setMode('map');
 } 
  
@@ -659,11 +659,12 @@ function updateGame(){
   const om=ms.filter(q=>S.opened.has(String(q.id))).length;
     const cst=currentStage();
   $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'')+(cst?' · Э'+cst.idx:'');
-  if(S.phase==='bonus'&&S.pos){
+  if(S.phase==='bonus'&&S.pos&&!S.bonusQuiz&&!S.fact){
     for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
       if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
-        S.opened.add(String(q.id));saveProg();toast('🔑 Фрагмент собран: '+q.answer);
-        if(bs.length&&bs.every(b=>S.opened.has(String(b.id))))win();
+        if(q.answer){ S.bonusQuiz=q; toast('🔎 Бонусная точка найдена! Отвечай на загадку.'); }
+        else captureBonus(q);
+        break;
       }
     }
   }
@@ -706,7 +707,7 @@ function updateGame(){
   } else if(S.mode==='fox'){ 
    S.foxTarget=null; renderFox(); 
   }
-  const rel=S.fact?[]:((S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id))));
+  const rel=(S.fact||S.bonusQuiz)?[]:((S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id))));
   S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
   S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
   renderRadarList();renderCard();refreshMarkers();
@@ -734,12 +735,18 @@ function renderFox(){
 function renderRadarList(){
   const ul=$('radarList');
   if(S.fact){ul.innerHTML='<li>✅ Точка открыта — читай факт на карточке.</li>';return;}
+  if(S.phase==='bonus'){
+    const got=[...S.opened].map(id=>bonuses().find(q=>String(q.id)===String(id))).filter(Boolean);
+    ul.innerHTML='<li><span>🔑 Осталось точек: '+(bonuses().length-got.length)+'</span><b>эфир рейда</b></li>'
+      +got.map(q=>'<li><span>✅ '+q.title+'</span><b>взята</b></li>').join('');
+    return;
+  }
   if(!S.pos){ul.innerHTML='<li>🛰 Ждём координаты... (дома включи 🧪 и кликни по карте)</li>';return;}
   if(!S.blips.length){ul.innerHTML='<li>Активных точек нет</li>';return;}
   ul.innerHTML=S.blips.slice(0,6).map(b=>'<li><span>'+b.t+'</span><b>'+fmtDist(b.d)+' · '+dirName(b.b)+'</b></li>').join('');
 }
 function renderFrags(){
-  $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?q.answer:'???')+'</span>';}).join('');
+  $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?(q.fragment||q.title):'???')+'</span>';}).join('');
 }
 function renderCard(){
   if(!S.quests.length){
@@ -763,6 +770,18 @@ function renderCard(){
   if(S.mode==='fox'&&!S.foxQuiz){$('card').hidden=true;return;}   // в охоте карточка не нужна, кроме загадки лисы
   $('card').hidden=false;
   fb.hidden=true;
+  if(S.phase==='bonus'&&S.bonusQuiz){
+    const bq=S.bonusQuiz;
+    bg.hidden=true;
+    $('cardTitle').textContent='🔎 '+bq.title;
+    $('cardDist').textContent='✅ Точка найдена! Отвечай на загадку.';
+    $('cardDesc').textContent=bq.desc||'';
+    bi.hidden=true;ar.hidden=false;
+    $('answerInput').disabled=false;$('answerBtn').disabled=false;
+    const wb=S.wrong[bq.id]||0;
+    if(wb>=2&&bq.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+bq.hint;}else hl.hidden=true;
+    return;
+  } 
   if(S.phase==='bonus'){
     $('cardTitle').textContent='🔑 Бонус-рейд: собери фрагменты!';
     $('cardDesc').textContent='На радаре — скрытые точки. Подойди к каждой вплотную, фрагмент добавится сам.';
@@ -837,6 +856,21 @@ function submitAnswer(){
     }
     return;
   }
+  if(S.bonusQuiz){
+    const bq=S.bonusQuiz;
+    const v=normAns($('answerInput').value);if(!v)return;
+    const ok=String(bq.answer).split('|').some(a=>normAns(a)===v);
+    if(ok){
+      S.bonusQuiz=null;S.wrong[bq.id]=0;$('answerInput').value='';
+      captureBonus(bq);
+      S.fact=bq;
+      updateGame();
+    } else {
+      S.wrong[bq.id]=(S.wrong[bq.id]||0)+1;
+      toast('❌ Неверно! Попытка '+S.wrong[bq.id]);renderCard();
+    }
+    return;
+  } 
   const t=target();if(!t||!S.atPoint)return;
   const v=normAns($('answerInput').value);if(!v)return;
   const ok=String(t.answer).split('|').some(a=>normAns(a)===v);
@@ -860,6 +894,7 @@ function tick(){
 function startBonus(){
   S.phase='bonus';
   S.fact=null;
+  S.bonusQuiz=null
   S.lockRadar=true;
   $('btnMap').disabled=true;setMode('radar');
   S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
@@ -874,9 +909,14 @@ function win(){
   S.fact=null;
   clearInterval(S.timerId);
   S.lockRadar=false;
-  $('winKey').textContent=bonuses().map(q=>q.answer).join('-');
+  $('winKey').textContent=bonuses().map(q=>q.fragment||q.title).join('-');
   $('ovWin').hidden=false;
   updateGame();
+}
+function captureBonus(q){
+  S.opened.add(String(q.id));saveProg();
+  toast('🔑 Точка «'+q.title+'» взята! Осталось: '+bonuses().filter(x=>!S.opened.has(String(x.id))).length);
+  if(bonuses().length&&bonuses().every(b=>S.opened.has(String(b.id))))win();
 }
 function fail(){clearInterval(S.timerId);$('ovFail').hidden=false;}
 
@@ -956,6 +996,7 @@ function normalizeRows(src){
     id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
     desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
     comment:(r.comment!=null?String(r.comment):''),
+    fragment:(r.fragment!=null?String(r.fragment):''),
     order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
   })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
 }
@@ -966,7 +1007,7 @@ function applyScenario(meta, quests, note){
   $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
   S.quests=quests;
-  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;
+  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;S.bonusQuiz=null;
   stopFoxAudio();
   if(S.mode==='fox'){ if(foxes().some(q=>!S.opened.has(String(q.id)))) setMode('fox'); else setMode('map'); }
   document.title='GPS Квест: '+(meta.title||'Рязань');
@@ -1029,7 +1070,7 @@ $('foxExit').onclick=()=>setMode('map');
 $('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;presentStage();};
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
 $('btnDebug').onclick=toggleDebug;
-$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
+$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.bonusQuiz=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
 $('btnStart').onclick=async()=>{
   const code=$('startCode').value.trim();
   if(!code){toast('🔑 Введи кодовое слово квеста');return;}
