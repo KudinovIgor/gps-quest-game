@@ -81,6 +81,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .done{width:22px;height:22px;border-radius:50%;background:var(--gr);color:#fff;font-size:13px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.5)}
 .dirArrow{width:30px;height:30px;position:relative;transform-origin:50% 50%}
 .dirArrow::before{content:'';position:absolute;left:50%;top:-3px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid #4fc3f7;filter:drop-shadow(0 0 3px rgba(79,195,247,.9))} 
+.followBtn{position:absolute;right:12px;z-index:1250;width:46px;height:46px;border-radius:50%;background:#102a3c;border:1px solid #1d4a63;color:#8ab4d8;font-size:22px;line-height:44px;text-align:center;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.followBtn.on{background:var(--cy);border-color:var(--cy);color:#032;box-shadow:0 0 14px rgba(0,229,255,.55)} 
 .dbg.stage{width:30px;height:30px;line-height:26px;font-size:13px;background:var(--cy);color:#032}
 .ed{display:flex;flex-direction:column;gap:6px;text-align:left;max-height:60vh;overflow:auto}
 .ed label{font-size:11px;color:#8ab4d8}
@@ -141,6 +143,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
    <button id="btnFact" hidden>➡ Дальше</button>
    <div id="hintLine" class="hint" hidden></div>
   </div>
+  <button id="btnFollow" class="followBtn" title="Слежение за игроком">◎</button>
  </div>
 </div>
 
@@ -263,7 +266,7 @@ const DEMO = [
 
 const $ = id => document.getElementById(id);
 const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null,
-    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null,shownQid:null};
+    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null,shownQid:null,follow:true};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -308,6 +311,7 @@ function initMap(){
   zoneCircle=L.circle([0,0],{radius:CONFIG.arriveRadius,color:'#00e5ff',weight:1.5,dashArray:'5 5',fillColor:'#00e5ff',fillOpacity:0,opacity:0,interactive:false}).addTo(map);
   dirMark=L.marker([0,0],{icon:L.divIcon({className:'',html:'<div class="dirArrow"></div>',iconSize:[30,30],iconAnchor:[15,15]}),interactive:false,opacity:0,zIndexOffset:350}).addTo(map);
   map.on('click',e=>{ if(S.testMode&&S.started){ setPos(e.latlng.lat,e.latlng.lng,5); toast('🧪 Телепорт: '+e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5)); } });
+  map.on('dragstart',()=>{ if(S.follow){S.follow=false;updateFollowBtn();} });  // повёл карту рукой — слежение off 
 }
 function refreshMarkers(){
   const t=(S.phase==='main'&&!S.fact)?target():null; // во время экрана факта следующая точка не светится
@@ -615,6 +619,8 @@ function setPos(lat,lng,acc){
   if(!S.centered){
    map.setView(S.pos,16);
    S.centered=true;
+  } else if(S.follow){
+   map.panTo(S.pos,{animate:true,duration:0.9});   // плавное слежение, как в навигаторе
   }
   updateGame();
 }
@@ -744,6 +750,9 @@ function updateGame(){
   S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
   S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
   renderRadarList();renderCard();refreshMarkers();
+  const fbtn=$('btnFollow'),cd=$('card');
+  fbtn.hidden=(S.mode!=='map');
+  fbtn.style.bottom=(cd.hidden?16:cd.offsetHeight+24)+'px';
 }
 function renderFox(){
   const done=foxes().filter(q=>S.opened.has(String(q.id))).length,tot=foxes().length;
@@ -1107,6 +1116,13 @@ $('btnFox').onclick=()=>setMode('fox');
 $('foxExit').onclick=()=>setMode('map');
 $('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;presentStage();};
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
+ function updateFollowBtn(){
+  const b=$('btnFollow');
+  b.classList.toggle('on',S.follow);
+  b.title=S.follow?'Слежение ВКЛ: карта идёт за тобой':'Слежение ВЫКЛ: карта стоит';
+}
+$('btnFollow').onclick=()=>{S.follow=!S.follow;updateFollowBtn();if(S.follow&&S.pos)map.panTo(S.pos,{animate:true,duration:0.6});};
+updateFollowBtn();
 $('btnDebug').onclick=toggleDebug;
 $('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.bonusQuiz=null;S.lockRadar=false;$('btnMap').disabled=false;clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
 $('btnStart').onclick=async()=>{
