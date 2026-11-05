@@ -72,6 +72,11 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .dbg.bonus{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
 .dbg.story{background:#8ab4f8;color:#0a1420}
+.foxSelHint{font-size:12px;color:#9fc6e8}
+.foxSelRow{display:flex;gap:10px;justify-content:center}
+.foxBtn{width:44px;height:44px;border-radius:50%;background:#102a3c;border:2px solid #1d4a63;color:var(--txt);font-weight:700;font-size:16px;cursor:pointer}
+.foxBtn.on{border-color:var(--gr);color:var(--gr);box-shadow:0 0 10px rgba(0,255,102,.35)}
+.foxBtn.done{background:#22303c;border-color:#33506a;color:#5b7d99;cursor:not-allowed}
 .done{width:22px;height:22px;border-radius:50%;background:var(--gr);color:#fff;font-size:13px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.5)}
 .dirArrow{width:30px;height:30px;position:relative;transform-origin:50% 50%}
 .dirArrow::before{content:'';position:absolute;left:50%;top:-3px;transform:translateX(-50%);width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid #4fc3f7;filter:drop-shadow(0 0 3px rgba(79,195,247,.9))} 
@@ -110,6 +115,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   </div>
   <div id="foxView" hidden>
    <div class="foxTop">🦊 ОХОТА НА ЛИС · поймано <span id="foxDone">0</span>/<span id="foxTotal">0</span></div>
+   <div class="foxSelHint" id="foxSelHint">Выбери лису для охоты:</div>
+   <div class="foxSelRow" id="foxSelRow"></div>   
    <div class="foxSigBig"><span id="foxPct">--</span>%</div>
    <div class="foxBarWrap"><div id="foxBar"></div></div>
    <div class="foxMeta"><span id="foxTrend">сканирую эфир...</span><span id="foxDbm"></span></div>
@@ -254,7 +261,7 @@ const DEMO = [
 
 const $ = id => document.getElementById(id);
 const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},code:null,delMode:false,editing:null,
-    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null};
+    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -401,7 +408,37 @@ function presentStage(){
   if(st.kind==='bonus'){ if(S.phase!=='bonus')$('ovBonus').hidden=false; return; }
   if(S.mode==='fox')setMode('map');
 } 
- 
+function foxStageQuests(){
+  const st=currentStage();
+  if(st&&st.kind==='foxhunter')return st.qs;   // кнопки = лисы ТЕКУЩЕГО этапа
+  return foxes();
+}
+function renderFoxSel(){
+  const list=foxStageQuests(), row=$('foxSelRow');
+  row.innerHTML='';
+  let selIdx=0;
+  list.forEach((q,i)=>{
+    const done=S.opened.has(String(q.id));
+    const on=!done&&S.foxSel&&String(S.foxSel.id)===String(q.id);
+    if(on)selIdx=i+1;
+    const b=document.createElement('button');
+    b.className='foxBtn'+(done?' done':'')+(on?' on':'');
+    b.textContent=i+1;
+    b.disabled=done;
+    b.onclick=()=>{S.foxSel=q;S.foxSig=null;S.foxHist=[];S.foxTarget=null;renderFoxSel();updateGame();};
+    row.appendChild(b);
+  });
+  $('foxSelHint').textContent=S.foxSel?('Охотимся на лису №'+selIdx+' — сигнал ведёт к ней'):'Выбери лису для охоты:';
+}
+function captureFox(q){
+  S.opened.add(String(q.id));saveProg();
+  if(S.foxSel&&String(S.foxSel.id)===String(q.id))S.foxSel=null;
+  S.wrong[q.id]=0;
+  foxContinuous(false);
+  toast('🦊 Лиса «'+q.title+'» поймана! Осталось: '+foxes().filter(x=>!S.opened.has(String(x.id))).length);
+  S.foxTarget=null;S.foxD=Infinity;S.foxSig=null;S.foxHist=[];
+  renderFoxSel();
+}
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
   if(debugLayer){map.removeLayer(debugLayer);debugLayer=null;}
@@ -637,19 +674,27 @@ function stopFoxAudio(){
  foxContinuous(false); 
 }
 function foxTick(){
-  if(S.mode!=='fox'||!audioCtx)return;
-  if(S.foxQuiz||S.fact){foxContinuous(false);return;}   // тишина, пока читаем загадку/факт
-  if(!S.foxTarget||!S.pos){foxContinuous(false);return;}
+  if(S.mode!=='fox')return;
+  if(S.foxQuiz||S.fact){foxContinuous(false);return;}
+  if(!S.foxTarget||!S.pos){foxContinuous(false);renderFox();return;}
   const q=S.foxTarget,d=S.foxD;
-  if(d<=q.radius){foxContinuous(true);return;}   // «диииииинь» — ты на лисе
+  const R=foxStageRange();
+  const t=Math.min(1,Math.max(0,(d-q.radius)/Math.max(1,R-q.radius)));
+  const raw=(d<=q.radius)?100:5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);
+  S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;   // сходится за ~1-2 c даже стоя на месте
+  S.foxHist.push({t:Date.now(),s:S.foxSig});
+  while(S.foxHist.length&&Date.now()-S.foxHist[0].t>4000)S.foxHist.shift();
+  S.foxT=t;
+  renderFox();
+  if(!audioCtx)return;
+  if(d<=q.radius){foxContinuous(true);return;}
   foxContinuous(false);
-  const t=(S.foxT!=null)?S.foxT:Math.min(1,d/CONFIG.foxRange);
   const interval=150+t*t*1850;
   const now=performance.now();
   if(now-lastBeepAt>=interval){
     lastBeepAt=now;
-    if(t>0.75){beep(780,0.07);setTimeout(()=>beep(780,0.07),150);}  // далеко: «дилинь-дидинь»
-    else beep(900+(1-t)*700,0.09);                                  // ближе: одиночные, тон выше
+    if(t>0.75){beep(780,0.07);setTimeout(()=>beep(780,0.07),150);}
+    else beep(900+(1-t)*700,0.09);
   }
 }
 
@@ -668,45 +713,19 @@ function updateGame(){
       }
     }
   }
-  /* --- охота на лис: сигнал по дистанции, без компаса --- */
-  const fx=foxes().filter(q=>!S.opened.has(String(q.id)));
+  /* --- охота на лис: сигнал и поимка ТОЛЬКО к выбранной лисе --- */
+  const fx=foxStageQuests().filter(q=>!S.opened.has(String(q.id)));
   if(S.mode==='fox'&&S.pos&&fx.length){
-    let best=null,bd=Infinity;
-    for(const q of fx){
-     const d=distM(S.pos[0],S.pos[1],q.lat,q.lng);
-     if(d<bd){
-      bd=d;
-      best=q;
-     }
-    }
-    S.foxTarget=best;
-    S.foxD=bd;
-    const R=foxStageRange();
-    const t=Math.min(1,Math.max(0,(bd-best.radius)/Math.max(1,R-best.radius)));
-    const raw=(bd<=best.radius)?100:5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);
-    S.foxT=t;
-    S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;     // сглаживание
-    S.foxHist.push({t:Date.now(),s:S.foxSig});
-    while(S.foxHist.length&&Date.now()-S.foxHist[0].t > 4000)
-     S.foxHist.shift();
-    if(bd<=best.radius&&!S.foxQuiz&&!S.fact){
-      if(!best.answer){
-        /* у лисы нет загадки в базе — ловим сразу (обратная совместимость) */
-        S.opened.add(String(best.id));saveProg();foxContinuous(false);
-        toast('🦊 Лиса «'+best.title+'» поймана! Осталось: '+foxes().filter(q=>!S.opened.has(String(q.id))).length);
-        S.foxTarget=null;S.foxSig=null;S.foxHist=[];
-        if(!foxes().some(q=>!S.opened.has(String(q.id))))
-         $('ovFoxDone').hidden=false;
-      } else {
-        /* лиса в ловушке: сначала загадка */
-        S.foxQuiz=best;foxContinuous(false);
-        toast('🦊 Лиса «'+best.title+'» в ловушке! Отвечай на загадку.');
+    const best=(S.foxSel&&fx.some(q=>String(q.id)===String(S.foxSel.id)))?S.foxSel:null;
+    if(best){
+      const bd=distM(S.pos[0],S.pos[1],best.lat,best.lng);
+      S.foxTarget=best;S.foxD=bd;
+      if(bd<=best.radius&&!S.foxQuiz&&!S.fact){
+        if(!best.answer){ captureFox(best); presentStage(); }
+        else { S.foxQuiz=best;foxContinuous(false); toast('🦊 Лиса «'+best.title+'» в ловушке! Отвечай на загадку.'); }
       }
-    }
-    renderFox();
-  } else if(S.mode==='fox'){ 
-   S.foxTarget=null; renderFox(); 
-  }
+    } else { S.foxTarget=null;S.foxD=Infinity; }
+  } else if(S.mode==='fox'){ S.foxTarget=null;S.foxD=Infinity; }
   const rel=(S.fact||S.bonusQuiz)?[]:((S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id))));
   S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
   S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
@@ -719,7 +738,7 @@ function renderFox(){
   if(!S.foxTarget){
     $('foxPct').textContent='--';$('foxBar').style.width='0%';$('foxDbm').textContent='';
     tr.className='';
-    tr.textContent=!S.pos?'🛰 ждём GPS...':(foxes().some(q=>!S.opened.has(String(q.id)))?'сканирую эфир...':'все лисы пойманы 🎉');
+        tr.textContent=!S.pos?'🛰 ждём GPS...':(!S.foxSel?'👆 выбери лису кнопкой выше':(foxes().some(q=>!S.opened.has(String(q.id)))?'сканирую эфир...':'все лисы пойманы 🎉'));
     return;
   }
   const s=Math.max(0,Math.min(100,Math.round(S.foxSig)));
@@ -841,13 +860,8 @@ function submitAnswer(){
     const v=normAns($('answerInput').value);if(!v)return;
     const ok=String(fq.answer).split('|').some(a=>normAns(a)===v);
     if(ok){
-      S.opened.add(String(fq.id));
-      invalidateStages();
-      saveProg();
-      S.wrong[fq.id]=0;
-      $('answerInput').value='';
       S.foxQuiz=null;S.fact=fq;
-      toast('🦊 Лиса «'+fq.title+'» поймана! Осталось: '+foxes().filter(q=>!S.opened.has(String(q.id))).length);
+      captureFox(fq);
       updateGame();
     } else {
       S.wrong[fq.id]=(S.wrong[fq.id]||0)+1;
@@ -973,10 +987,12 @@ function setMode(m){
   $('radarView').hidden=m!=='radar';
   $('foxView').hidden=m!=='fox';
   if(m==='map')setTimeout(()=>map.invalidateSize(),60);
-  if(m==='fox'){
-   ensureAudio();
-   startFoxBeeps();
-  }else{
+  if(m==='fox'){ 
+   ensureAudio(); 
+   startFoxBeeps(); 
+   renderFoxSel(); 
+  }
+  else{
    stopFoxAudio();
    S.foxQuiz=null;
   }
@@ -1007,7 +1023,7 @@ function applyScenario(meta, quests, note){
   $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
   S.quests=quests;
-  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;S.bonusQuiz=null;
+  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.foxT=null;S.story=null;S.foxDoneShown=false;S.bonusQuiz=null;S.foxSel=null;
   stopFoxAudio();
   if(S.mode==='fox'){ if(foxes().some(q=>!S.opened.has(String(q.id)))) setMode('fox'); else setMode('map'); }
   document.title='GPS Квест: '+(meta.title||'Рязань');
