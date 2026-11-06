@@ -270,7 +270,7 @@ const DEMO = [
 
 const $ = id => document.getElementById(id);
 const S = {quests:[],opened:new Set(),mode:'map',phase:'main',pos:null,acc:0,watchId:null,testMode:false,centered:false,atPoint:false,wrong:{},bonusEndsAt:0,timerId:null,lockRadar:false,blips:[],maxRange:500,started:false,fact:null,debug:false,scenario:{slug:'main',title:''},delMode:false,editing:null,
-    foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null,shownQid:null,follow:true,foxDonePending:false};
+        foxSig:null,foxHist:[],foxTarget:null,foxD:Infinity,foxTimer:null,foxQuiz:null,foxT:null,story:null,foxDoneShown:false,bonusQuiz:null,foxSel:null,wakeLock:null,wasHiddenAt:null};
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
 function saveProg(){ localStorage.setItem(progKey(), JSON.stringify([...S.opened])); }
@@ -1036,8 +1036,51 @@ function toast(msg,ms=3500){
  clearTimeout(toastT);
  toastT=setTimeout(()=>el.classList.remove('show'),ms);
 }
-
-/* ---------- загрузка: публичный сценарий или секретный по коду ---------- */
+ 
+/* ---------- Wake Lock: экран не гаснет во время игры ---------- */
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator&&!S.wakeLock){
+      S.wakeLock=await navigator.wakeLock.request('screen');
+      S.wakeLock.addEventListener('release',()=>{S.wakeLock=null;});
+      toast('🔒 Экран не будет гаснуть.');
+    }
+  }catch(e){
+    // пользователь отказал или API недоступно (например, Firefox)
+  }
+}
+function releaseWakeLock(){
+  if(S.wakeLock){
+    S.wakeLock.release();
+    S.wakeLock=null;
+  }
+}
+/* ---------- Компенсация времени при блокировке экрана ---------- */
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){
+    // экран заблокирован или вкладка неактивна
+    S.wasHiddenAt=Date.now();
+    // приостановить звуковые генераторы (иначе будут глитчи)
+    if(foxOsc){try{foxOsc.stop();}catch(e){}foxOsc=null;foxGain=null;}
+  } else {
+    // экран разблокирован
+    if(S.wasHiddenAt&&S.phase==='bonus'){
+      // компенсация времени: продлеваем дедлайн на время простоя
+      const elapsed=Date.now()-S.wasHiddenAt;
+      S.bonusEndsAt+=elapsed;
+      const secs=Math.round(elapsed/1000);
+      if(secs>5)toast('⏱ Время продлено на '+secs+' сек простоя.');
+    }
+    // перезапустить звуковые генераторы для режима охоты
+    if(S.mode==='fox'&&S.foxTarget){
+      ensureAudio();
+      if(S.foxD<=S.foxTarget.radius)foxContinuous(true);
+    }
+    S.wasHiddenAt=null;
+    // запросить Wake Lock заново (он снимается при блокировке)
+    requestWakeLock();
+  }
+});
 function normalizeRows(src){
   return src.map((r,i)=>({
     id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
@@ -1107,12 +1150,27 @@ $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('
 $('btnFollow').onclick=()=>{S.follow=!S.follow;updateFollowBtn();if(S.follow&&S.pos)map.panTo(S.pos,{animate:true,duration:0.6});};
 updateFollowBtn();
 $('btnDebug').onclick=toggleDebug;
-$('btnReset').onclick=()=>{if(!confirm('Сбросить весь прогресс?'))return;S.opened.clear();saveProg();S.phase='main';S.fact=null;S.bonusQuiz=null;S.lockRadar=false;clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
+$('btnReset').onclick=()=>{
+ if(!confirm('Сбросить весь прогресс?'))
+  return;
+ S.opened.clear();
+ saveProg();
+ S.phase='main';
+ S.fact=null;
+ S.bonusQuiz=null;
+ S.lockRadar=false;
+ releaseWakeLock();
+ clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
 $('btnStart').onclick=async()=>{
   const code=$('startCode').value.trim();
   if(!code){toast('🔑 Введи кодовое слово квеста');return;}
   const ok=await loadByCode(code,false);
-  if(ok){$('ovStart').hidden=true;S.started=true;startGeo();}
+  if(ok){
+    $('ovStart').hidden=true;
+    S.started=true;
+    startGeo();
+    requestWakeLock();  // экран не будет гаснуть
+  }
 };
 $('startCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnStart').click();});
 $('passInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnPassOk').click();});
