@@ -820,6 +820,7 @@ function renderCard(){
   /* --- факт теперь живёт в центральном оверлее ovFact --- */
   if(S.fact){ $('card').hidden=true; return; }
   if(S.mode==='fox'&&!S.foxQuiz){$('card').hidden=true;return;}   // в охоте карточка не нужна, кроме загадки лисы
+  $('card').hidden=false;
   if(S.phase==='bonus'&&S.bonusQuiz){
     const bq=S.bonusQuiz;
     bg.hidden=true;
