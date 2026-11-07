@@ -860,6 +860,11 @@ function renderCard(){
       $('cardDesc').textContent='Поймай всех лис этапа в режиме 🦊 — маршрут продолжится сам.';
       $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
     }
+    if(st&&st.kind==='story'){
+      $('cardTitle').textContent='📜 Страница истории';
+      $('cardDesc').textContent='Читай окно истории — после «Далее» маршрут продолжится.';
+      $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
+    } 
     $('cardTitle').textContent='🎉 Все основные точки открыты!';
     $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
     $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
@@ -1151,17 +1156,20 @@ $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('
 $('btnFollow').onclick=()=>{S.follow=!S.follow;updateFollowBtn();if(S.follow&&S.pos)map.panTo(S.pos,{animate:true,duration:0.6});};
 updateFollowBtn();
 $('btnDebug').onclick=toggleDebug;
-$('btnReset').onclick=()=>{
- if(!confirm('Сбросить весь прогресс?'))
-  return;
- S.opened.clear();
- saveProg();
- S.phase='main';
- S.fact=null;
- S.bonusQuiz=null;
- S.lockRadar=false;
- releaseWakeLock();
- clearInterval(S.timerId);stopFoxAudio();if(S.mode==='fox')setMode('map');$('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;updateGame();toast('Прогресс сброшен.');};
+$$('btnReset').onclick=()=>{
+  if(!confirm('Сбросить весь прогресс?'))return;
+  S.opened.clear();saveProg();
+  S.phase='main';S.fact=null;S.bonusQuiz=null;S.foxQuiz=null;S.story=null;S.wrong={};
+  S.foxSel=null;S.shownQid=null;S.foxDonePending=false;
+  S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxD=Infinity;
+  S.lockRadar=false;
+  clearInterval(S.timerId);stopFoxAudio();
+  if(S.mode==='fox')setMode('map');
+  $('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;$('ovStory').hidden=true;
+  updateGame();
+  presentStage();      // заново предъявить первый этап: story/лисы/бонус/точки
+  toast('Прогресс сброшен.');
+};
 $('btnStart').onclick=async()=>{
   const code=$('startCode').value.trim();
   if(!code){toast('🔑 Введи кодовое слово квеста');return;}
