@@ -385,6 +385,34 @@ function computeStages(){
   return stages;
 }
 
+/* ---------- оценка длины маршрута для отладки ---------- */
+function routeKm(){
+  const stages=(typeof getStages==='function')?getStages():computeStages();
+  const D=(a,b)=>distM(a.lat,a.lng,b.lat,b.lng);
+  const WALK=1.3;               // коэффициент уличности: прямые линии → реальная ходьба
+  let total=0, prev=null;
+  for(const st of stages){
+    if(st.kind==='story')continue;                 // история не добавляет метров
+    if(st.kind==='main'){
+      for(const q of st.qs){ if(prev)total+=D(prev,q); prev=q; }
+    } else {
+      if(!st.qs.length)continue;
+      let entry=st.qs[0], best=prev?D(prev,entry):0;   // вход в кластер — ближайшая точка
+      if(prev)for(const q of st.qs){const d=D(prev,q);if(d<best){best=d;entry=q;}}
+      if(prev)total+=best;
+      const rest=st.qs.filter(q=>q!==entry);           // жадный обход: ближайшая следующая
+      let cur=entry;
+      while(rest.length){
+        let ni=0,nd=Infinity;
+        rest.forEach((q,i)=>{const d=D(cur,q);if(d<nd){nd=d;ni=i;}});
+        total+=nd;cur=rest.splice(ni,1)[0];
+      }
+      prev=cur;
+    }
+  }
+  return total*WALK/1000;
+}
+
 /* ---------- этапы: гейтинг и презентация ---------- */
 let cachedStages=null;
 function invalidateStages(){ cachedStages=null; }
@@ -751,6 +779,10 @@ function updateGame(){
   else if(cst&&cst.kind==='bonus')mst.textContent='📡 Бонус-рейд доступен — начни, когда готов';
   else if(cst)mst.textContent='🗺 Маршрут: этап Э'+cst.idx;
   else mst.textContent=S.quests.length?'🏁 Весь маршрут пройден!':'';
+  if(S.debug&&S.quests.length){
+    const km=routeKm();
+    mst.textContent+=' · 📏 '+km.toFixed(1)+' км'+(km>10?' ⚠️ много!':'');
+  }
   if(S.phase==='bonus'&&S.pos&&!S.bonusQuiz&&!S.fact){
     for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
       if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
