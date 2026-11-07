@@ -125,7 +125,6 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
    <div class="foxBarWrap"><div id="foxBar"></div></div>
    <div class="foxMeta"><span id="foxTrend">сканирую эфир...</span><span id="foxDbm"></span></div>
    <div class="foxHint">Иди туда, где сигнал и звук усиливаются. Цифры — уровень «приёма» маяка: чем ближе, тем выше. Пойдёшь не туда — сигнал упадёт.</div>
-   <button id="foxExit" class="chip">🗺 Выйти на карту</button>
   </div>
   <div id="card">
    <h3 id="cardTitle">Загрузка...</h3>
@@ -695,18 +694,23 @@ function stopFoxAudio(){
 }
 function foxTick(){
   if(S.mode!=='fox')return;
-  if(S.foxQuiz||S.fact){foxContinuous(false);return;}
   if(!S.foxTarget||!S.pos){foxContinuous(false);renderFox();return;}
   const q=S.foxTarget,d=S.foxD;
   const R=foxStageRange();
-  const t=Math.min(1,Math.max(0,(d-q.radius)/Math.max(1,R-q.radius)));
-  const raw=(d<=q.radius)?100:5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);
-  S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;   // сходится за ~1-2 c даже стоя на месте
+  const t=Math.min(1,d/R);                          // процент считаем ДО ТОЧКИ, а не до круга
+  const raw=5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);
+  S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;
   S.foxHist.push({t:Date.now(),s:S.foxSig});
   while(S.foxHist.length&&Date.now()-S.foxHist[0].t>4000)S.foxHist.shift();
-  renderFox();
+  renderFox();                                      // проценты бегают всегда, пока есть цель
   if(!audioCtx)return;
-  if(d<=q.radius){foxContinuous(true);return;}
+  if(S.foxQuiz||S.fact){                            // загадка/факт открыты: прибор шепчет
+    foxContinuous(false);
+    const now=performance.now();
+    if(now-lastBeepAt>=1200){lastBeepAt=now;beep(660,0.06,0.05);}   // приглушённый тик
+    return;
+  }
+  if(d<=q.radius){foxContinuous(true);return;}      // «дииииинь» на кромке круга
   foxContinuous(false);
   const interval=150+t*t*1850;
   const now=performance.now();
@@ -1145,7 +1149,6 @@ loadProg();initMap();
 $('btnMap').onclick=()=>setMode('map');
 $('btnRadar').onclick=()=>setMode('radar');
 $('btnFox').onclick=()=>setMode('fox');
-$('foxExit').onclick=()=>setMode('map');
 $('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;presentStage();};
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
  function updateFollowBtn(){
