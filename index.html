@@ -1156,7 +1156,7 @@ $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('
 $('btnFollow').onclick=()=>{S.follow=!S.follow;updateFollowBtn();if(S.follow&&S.pos)map.panTo(S.pos,{animate:true,duration:0.6});};
 updateFollowBtn();
 $('btnDebug').onclick=toggleDebug;
-$$('btnReset').onclick=()=>{
+$('btnReset').onclick=()=>{
   if(!confirm('Сбросить весь прогресс?'))return;
   S.opened.clear();saveProg();
   S.phase='main';S.fact=null;S.bonusQuiz=null;S.foxQuiz=null;S.story=null;S.wrong={};
