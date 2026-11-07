@@ -70,7 +70,8 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .pulse{width:36px;height:36px;border-radius:50%;background:rgba(0,229,255,.35);border:2px solid var(--cy);animation:pul 1.6s infinite}
 @keyframes pul{0%{box-shadow:0 0 0 0 rgba(0,229,255,.5)}100%{box-shadow:0 0 0 22px rgba(0,229,255,0)}}
 .dbg{width:24px;height:24px;border-radius:50%;background:var(--warn);color:#20150a;font-weight:700;font-size:12px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.6)}
-.dbg.bonus{background:#c77dff;color:#1b0630}
+.dbg.bonus{background:#6c9bd2;color:#0a1420}
+.dbg.fox{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
 .dbg.story{background:#8ab4f8;color:#0a1420}
 .foxSelHint{font-size:12px;color:#9fc6e8}
@@ -468,12 +469,24 @@ function renderDebug(fit){
   }
   if(verts.length>1)L.polyline(verts,{color:'#00e5ff',weight:2,dashArray:'6 6',opacity:.85,interactive:false}).addTo(debugLayer);
   /* описывающий круг и бейдж этапа — только для групп */
+  const PAL={main:'#ffc857',foxhunter:'#c77dff',bonus:'#6c9bd2',story:'#8ab4f8'};
   for(const st of stages){
-    if(st.kind==='main'||st.qs.length<2)continue;
-    L.circle([st.centerLat,st.centerLng],{radius:st.rM,color:st.kind==='bonus'?'#c77dff':'#00ff66',weight:1.5,opacity:.7,dashArray:'8 6',fillOpacity:.05,interactive:false}).addTo(debugLayer);
-    L.marker([st.centerLat,st.centerLng],{icon:L.divIcon({className:'',html:'<div class="dbg stage">Э'+st.num+'</div>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:400})
-      .bindTooltip('Э'+st.num+': '+st.kind+' | точек: '+st.qs.length+' | id: '+st.qs.map(q=>q.id).join(','),{direction:'top',offset:[0,-14]})
-      .addTo(debugLayer);
+    if(st.kind==='main')continue;
+    const col=PAL[st.kind]||'#8ab4f8';
+    const center=[st.centerLat,st.centerLng];
+    if(st.qs.length>1){
+      /* описывающая окружность этапа: пунктир и заливка в цвет этапа */
+      L.circle(center,{radius:st.rM,color:col,weight:2,opacity:.85,dashArray:'8 6',fillColor:col,fillOpacity:.06,interactive:false}).addTo(debugLayer);
+      L.marker(center,{icon:L.divIcon({className:'',html:'<div class="dbg stage" style="background:'+col+';color:#0a1420">Э'+st.num+'</div>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:400})
+        .bindTooltip('Э'+st.num+': '+st.kind+' | точек: '+st.qs.length+' | id: '+st.qs.map(q=>q.id).join(','),{direction:'top',offset:[0,-14]})
+        .addTo(debugLayer);
+      /* радиальные спицы центр→точки для лис и бонусов */
+      if(st.kind==='foxhunter'||st.kind==='bonus'){
+        st.qs.forEach(q=>{
+          L.polyline([center,[q.lat,q.lng]],{color:col,weight:1.5,opacity:.55,interactive:false}).addTo(debugLayer);
+        });
+      }
+    }
   }
   S.quests.forEach(q=>{ L.circle([q.lat,q.lng],{radius:q.radius,color:'#00ff66',weight:1,opacity:.45,dashArray:'3 4',fillOpacity:0,interactive:false}).addTo(debugLayer); });
   const mk=(q,label,cls)=>{
@@ -486,7 +499,7 @@ function renderDebug(fit){
   const ms=mains(),bs=bonuses(),fx=foxes(),sts=stories();
   ms.forEach((q,i)=>mk(q,i+1,''));
   bs.forEach((q,i)=>mk(q,'Б'+(i+1),'bonus'));
-  fx.forEach((q,i)=>mk(q,'Л'+(i+1),'bonus'));
+  fx.forEach((q,i)=>mk(q,'Л'+(i+1),'fox'));
   sts.forEach((q,i)=>mk(q,'С'+(i+1),'story'));
   const all=S.quests.map(q=>[q.lat,q.lng]);
   if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
