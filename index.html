@@ -532,15 +532,22 @@ function renderDebug(fit){
   const all=S.quests.map(q=>[q.lat,q.lng]);
   if(fit&&all.length)map.fitBounds(L.latLngBounds(all),{padding:[50,50]});
 }
-function toggleDebug(){
-  S.debug=!S.debug;
-  $('btnDebug').classList.toggle('on',S.debug);
-  $('segModes').hidden=!S.debug;
-  $('btnAdd').hidden=!S.debug;
-  $('btnDel').hidden=!S.debug;
-  $('btnTest').hidden=!S.debug;
-  renderDebug(true);
-  toast(S.debug?'🐞 Отладка ВКЛ: номера, связи, переключение режимов и ➕➖ доступны.':'🐞 Отладка ВЫКЛ');
+async function toggleDebug(){
+  if (!S.debug) {
+    // При включении отладки запрашиваем пароль, если он ещё не введён за эту сессию
+    const pass = await ensurePass();
+    if (!pass) return; // Пароль не введён или отменён, отладка не включается
+  }
+  
+  S.debug = !S.debug;
+  $('btnDebug').classList.toggle('on', S.debug);
+  $('btnTest').hidden = !S.debug;
+  $('btnAdd').hidden = !S.debug;
+  $('btnDel').hidden = !S.debug;
+  $('segModes').hidden = !S.debug; // в отладке можно переключать режимы всегда
+  renderDebug();
+  updateGame();
+  toast(S.debug ? '🐞 Отладка ВКЛ' : '🐞 Отладка выкл');
 }
 /* ---------- отладка: перенос точек с сохранением в БД ---------- */
 async function rpcMove(q, pass){
@@ -579,11 +586,32 @@ async function onQuestMoved(q,label){
 
 /* ---------- админ-редактор: создать / изменить / удалить ---------- */
 async function ensurePass(){
-  let p=sessionStorage.getItem('gq_editor_pass');
-  if(p)return p;
-  p=await askEditorPass();
-  if(p)sessionStorage.setItem('gq_editor_pass',p);
-  return p;
+  // Если уже аутентифицированы в этой сессии, пропускаем показ окна
+  if(sessionStorage.getItem('gq_editor_pass')) return true;
+  
+  $('ovPass').hidden = false;
+  return new Promise(res => {
+    const check = () => {
+      // TODO: не забудь сменить '1234' на свой реальный пароль администратора!
+      if($('passInput').value.trim() === '1234'){ 
+        sessionStorage.setItem('gq_editor_pass', '1');
+        $('ovPass').hidden = true;
+        $('passInput').value = '';
+        res(true);
+      } else {
+        toast('❌ Неверный пароль');
+        $('passInput').value = '';
+        $('passInput').focus(); // Даём возможность ввести пароль повторно
+      }
+    };
+    
+    $('btnPassOk').onclick = check;
+    $('btnPassCancel').onclick = () => {
+      $('ovPass').hidden = true;
+      $('passInput').value = '';
+      res(false);
+    };
+  });
 }
 async function rpcSaveQuest(d,pass){
   try{
