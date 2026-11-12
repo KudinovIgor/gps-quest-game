@@ -1166,12 +1166,24 @@ document.addEventListener('visibilitychange',()=>{
 });
 function normalizeRows(src){
   return src.map((r,i)=>({
-    id:r.id??('d'+i),title:r.title||('Точка '+(i+1)),lat:+(r.lat??r.latitude),lng:+(r.lng??r.longitude),
-    desc:r.description||'',answer:(r.answer!=null?String(r.answer):''),hint:(r.hint!=null?String(r.hint):''),
-    comment:(r.comment!=null?String(r.comment):''),
-    fragment:(r.fragment!=null?String(r.fragment):''),
-    order:(r.sort_order!=null?+r.sort_order:i),kind:(r.kind||'main'),radius:(+r.radius_m||CONFIG.arriveRadius)
-  })).filter(q=>isFinite(q.lat)&&isFinite(q.lng)).sort((a,b)=>a.order-b.order);
+    id: r.id ?? ('d'+i),
+    title: r.title || ('Точка '+(i+1)),
+    lat: +(r.lat ?? r.latitude),
+    lng: +(r.lng ?? r.longitude),
+    desc: r.description || '',
+    answer: (r.answer != null ? String(r.answer) : ''),
+    hint: (r.hint != null ? String(r.hint) : ''),
+    comment: (r.comment != null ? String(r.comment) : ''),
+    
+    // === НОВОЕ: читаем JSON-настройки, а fragment оставляем как запасной вариант ===
+    settings: r.settings || (r.fragment ? {raw: r.fragment} : {}),
+    fragment: r.fragment || '', // для обратной совместимости (например, в renderFrags)
+    
+    order: (r.sort_order != null ? +r.sort_order : i),
+    kind: (r.kind || 'main'),
+    radius: (+r.radius_m || CONFIG.arriveRadius),
+    stage_id: r.stage_id // новое поле связи с этапом
+  })).filter(q => isFinite(q.lat) && isFinite(q.lng)).sort((a,b) => a.order - b.order);
 }
 function applyScenario(meta, quests, note){
   invalidateStages();
