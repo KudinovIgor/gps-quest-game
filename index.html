@@ -1219,7 +1219,7 @@ async function loadByCode(code, silent){
     const data=await r.json();
     if(!data||!data.slug){ if(!silent)toast('❌ Код не распознан.'); return false; }
     localStorage.setItem('gq_code', code);
-    applyScenario({slug:data.slug,title:data.title||data.slug,code:code}, normalizeRows(data.quests||[]),
+    applyScenario({slug:data.slug,title:data.title||data.slug,code:code}, normalizeRows(data.points||[]),
       '🔑 Сценарий «'+(data.title||data.slug)+'» загружен!');
     return true;
   }catch(e){ if(!silent)toast('⚠️ Не удалось проверить код: '+e.message); return false; }
