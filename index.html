@@ -585,31 +585,39 @@ async function onQuestMoved(q,label){
 }
 
 /* ---------- админ-редактор: создать / изменить / удалить ---------- */
-async function ensurePass(){
-  // Если уже аутентифицированы в этой сессии, пропускаем показ окна
-  if(sessionStorage.getItem('gq_editor_pass')) return true;
-  
+async function ensurePass() {
+  // Если пароль уже есть в сессии, молча возвращаем true
+  if (sessionStorage.getItem('gq_editor_pass')) {
+    return true;
+  }
+
   $('ovPass').hidden = false;
-  return new Promise(res => {
+  $('passInput').value = '';
+  $('passInput').focus();
+
+  return new Promise(resolve => {
     const check = () => {
-      // TODO: не забудь сменить '1234' на свой реальный пароль администратора!
-      if($('passInput').value.trim() === '1234'){ 
-        sessionStorage.setItem('gq_editor_pass', '1');
+      const val = $('passInput').value.trim();
+      // ЗАМЕНИ 'admin' на свой реальный пароль
+      if (val === 'admin') { 
+        // Сохраняем САМ пароль, а не просто слово 'verified'
+        sessionStorage.setItem('gq_editor_pass', val); 
         $('ovPass').hidden = true;
-        $('passInput').value = '';
-        res(true);
+        resolve(true);
       } else {
-        toast('❌ Неверный пароль');
+        toast('❌ Неверный пароль редактора');
         $('passInput').value = '';
-        $('passInput').focus(); // Даём возможность ввести пароль повторно
+        $('passInput').focus();
       }
     };
-    
+
     $('btnPassOk').onclick = check;
     $('btnPassCancel').onclick = () => {
       $('ovPass').hidden = true;
-      $('passInput').value = '';
-      res(false);
+      resolve(false);
+    };
+    $('passInput').onkeydown = (e) => { 
+      if (e.key === 'Enter') check(); 
     };
   });
 }
@@ -647,24 +655,47 @@ function openEditor(q){
 }
 async function editorSave(){
   invalidateStages();
-  const d=S.editing;if(!d)return;
-  const title=$('edTitle').value.trim();
-  const lat=parseFloat($('edLat').value),lng=parseFloat($('edLng').value);
-  if(!title){toast('⚠️ Введи название.');return;}
-  if(!isFinite(lat)||!isFinite(lng)){toast('⚠️ Широта/долгота не числа.');return;}
-  if(S.scenario.slug==='demo'){toast('🧪 Демо-точки в БД не пишутся.');return;}
-  Object.assign(d,{title,lat,lng,desc:$('edDesc').value,answer:$('edAnswer').value,hint:$('edHint').value,
-    comment:$('edComment').value,order:parseInt($('edOrder').value,10)||0,kind:$('edKind').value,
-    radius:parseInt($('edRadius').value,10)||CONFIG.arriveRadius});
-  const id=await rpcSaveQuest(d,pass);
-  if(id===-1){sessionStorage.removeItem('gq_editor_pass');toast('❌ Неверный пароль редактора.');return;}
-  if(id===-2){toast('⚠️ Ошибка связи с БД.');return;}
-  if(d.id==null){d.id=id;S.points.push(d);}
-  else{const q=S.points.find(x=>String(x.id)===String(d.id));if(q)Object.assign(q,d);}
-  S.points.sort((a,b)=>a.order-b.order);
-  $('ovEdit').hidden=true;S.editing=null;
-  updateGame();renderDebug();
-  toast('💾 Сохранено в БД (id='+id+').');
+  const d = S.editing;
+  if (!d) return;
+  const title = $('edTitle').value.trim();
+  const lat = parseFloat($('edLat').value), lng = parseFloat($('edLng').value);
+  if (!title) { toast('⚠️ Введи название.'); return; }
+  if (!isFinite(lat) || !isFinite(lng)) { toast('⚠️ Широта/долгота не числа.'); return; }
+  if (S.scenario.slug === 'demo') { toast('🧪 Демо-точки в БД не пишутся.'); return; }
+  Object.assign(d, {
+    title, lat, lng,
+    desc: $('edDesc').value,
+    answer: $('edAnswer').value,
+    hint: $('edHint').value,
+    comment: $('edComment').value,
+    order: parseInt($('edOrder').value, 10) || 0,
+    kind: $('edKind').value,
+    radius: parseInt($('edRadius').value, 10) || CONFIG.arriveRadius
+  });
+  const pass = sessionStorage.getItem('gq_editor_pass') || '';
+  const id = await rpcSaveQuest(d, pass);
+  if (id === -1) {
+    sessionStorage.removeItem('gq_editor_pass'); // Сбрасываем, если бэкенд его отверг
+    toast('❌ Неверный пароль редактора.');
+    return;
+  }
+  if (id === -2) {
+    toast('⚠️ Ошибка связи с БД.');
+    return;
+  }
+  if (d.id == null) {
+    d.id = id;
+    S.points.push(d);
+  } else {
+    const q = S.points.find(x => String(x.id) === String(d.id));
+    if (q) Object.assign(q, d);
+  }
+  S.points.sort((a, b) => a.order - b.order);
+  $('ovEdit').hidden = true;
+  S.editing = null;
+  updateGame();
+  renderDebug();
+  toast('💾 Сохранено в БД (id=' + id + ').');
 }
 async function editorDelete(){
   const d=S.editing;if(!d||d.id==null)return;
