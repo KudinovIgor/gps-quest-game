@@ -656,7 +656,6 @@ async function editorSave(){
   Object.assign(d,{title,lat,lng,desc:$('edDesc').value,answer:$('edAnswer').value,hint:$('edHint').value,
     comment:$('edComment').value,order:parseInt($('edOrder').value,10)||0,kind:$('edKind').value,
     radius:parseInt($('edRadius').value,10)||CONFIG.arriveRadius});
-  const pass=await ensurePass();if(!pass)return;
   const id=await rpcSaveQuest(d,pass);
   if(id===-1){sessionStorage.removeItem('gq_editor_pass');toast('❌ Неверный пароль редактора.');return;}
   if(id===-2){toast('⚠️ Ошибка связи с БД.');return;}
@@ -670,7 +669,6 @@ async function editorSave(){
 async function editorDelete(){
   const d=S.editing;if(!d||d.id==null)return;
   if(!confirm('Удалить точку «'+d.title+'» из базы? Отменить будет нельзя!'))return;
-  const pass=await ensurePass();if(!pass)return;
   const ok=await rpcDeleteQuest(d.id,pass);
   if(!ok){sessionStorage.removeItem('gq_editor_pass');toast('❌ Неверный пароль или точка не найдена.');return;}
   S.points=S.points.filter(x=>String(x.id)!==String(d.id));
@@ -681,7 +679,6 @@ async function editorDelete(){
 async function delById(q,label){
   if(S.scenario.slug==='demo'){toast('🧪 Демо-точки не удаляются из БД.');return;}
   if(!confirm('Удалить точку '+label+' «'+q.title+'» из базы?'))return;
-  const pass=await ensurePass();if(!pass)return;
   const ok=await rpcDeleteQuest(q.id,pass);
   if(!ok){sessionStorage.removeItem('gq_editor_pass');toast('❌ Неверный пароль или точка не найдена.');return;}
   S.points=S.points.filter(x=>String(x.id)!==String(q.id));
