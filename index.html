@@ -204,6 +204,31 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
   </div>
 </div>
 
+<!-- Модальное окно создания/редактирования ЭТАПА -->
+<div id="ovStageEdit" class="overlay" hidden>
+  <div class="box">
+    <h2 id="stageEditTitle">✏️ Этап</h2>
+    <div class="ed">
+      <div><label>Название этапа</label><input id="stTitle" placeholder="Например: Бонус-рейд"></div>
+      <div><label>Тип этапа</label>
+        <select id="stRuleType">
+          <option value="linear">Линейный (обычные точки по порядку)</option>
+          <option value="bonus">Бонус (таймер, любой порядок)</option>
+          <option value="foxhunter">Охота на лис</option>
+          <option value="story">История (текстовая вставка)</option>
+          <option value="flashlight">Фонарик (туман войны)</option>
+          <option value="sequence">Строгая последовательность (ошибка = рестарт)</option>
+        </select>
+      </div>
+      <div id="stTimerWrap" hidden><label>Таймер (секунды)</label><input id="stTimer" type="number" value="600"></div>
+      
+      <button id="stSave" style="margin-top:10px">💾 Сохранить этап</button>
+      <button id="stDelete" class="sec" hidden>🗑 Удалить этап</button>
+      <button id="stCancel" class="sec">Отмена</button>
+    </div>
+  </div>
+</div> 
+
 <!-- Редактор точки (отдельное окно) -->
 <div id="ovPointEdit" class="overlay" hidden>
   <div class="box">
@@ -220,6 +245,9 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
         <div><label>Подсказка</label><input id="edHint"></div>
       </div>
       <div><label>Факт после ответа</label><textarea id="edComment" rows="2"></textarea></div>
+      <div><label>Этап</label>
+        <select id="edStageId" style="background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:8px;width:100%"></select>
+      </div>
       <div class="row">
         <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
         <div style="display:flex;flex-direction:column;gap:4px">
@@ -580,28 +608,127 @@ function openPointEditor(point, stageId) {
   $('ovPointEdit').hidden = false;
 }
 
-$('btnAddStage').onclick = () => {
-  const title = prompt('Название этапа:');
-  if (!title) return;
-  const ruleType = prompt('Тип этапа (linear/bonus/foxhunter/flashlight):', 'linear');
-  if (!ruleType) return;
+/* ========== НОВОЕ УПРАВЛЕНИЕ ЭТАПАМИ И ТОЧКАМИ ========== */
+
+// 1. Открытие окна этапа
+function openStageEditor(stage) {
+  S.editingStage = stage || null;
+  $('stageEditTitle').textContent = stage ? '✏️ Редактировать этап' : '➕ Новый этап';
+  $('stTitle').value = stage ? stage.title : '';
+  $('stRuleType').value = stage ? (stage.rule_type || stage.kind || 'linear') : 'linear';
   
-  // Отправляем в БД
-  rpcSaveStage({
-    scenario_slug: S.scenario.slug,
-    title,
-    rule_type: ruleType,
-    sort_order: S.stages.length,
-    settings: {}
-  });
+  // Показываем таймер только для бонуса/последовательности/фонарика
+  const isTimed = ['bonus', 'sequence', 'flashlight'].includes($('stRuleType').value);
+  $('stTimerWrap').hidden = !isTimed;
+  $('stTimer').value = stage && stage.settings?.global_timer ? stage.settings.global_timer : 600;
+  
+  $('stDelete').hidden = !stage;
+  $('ovStageEdit').hidden = false;
+}
+
+// 2. Реакция на смену типа этапа (показать/скрыть таймер)
+$('stRuleType').onchange = () => {
+  const isTimed = ['bonus', 'sequence', 'flashlight'].includes($('stRuleType').value);
+  $('stTimerWrap').hidden = !isTimed;
 };
 
+// 3. Сохранение этапа
+$('stSave').onclick = async () => {
+  const title = $('stTitle').value.trim();
+  if (!title) { toast('⚠️ Введи название этапа'); return; }
+  
+  const settings = {};
+  if (!$('stTimerWrap').hidden) {
+    settings.global_timer = parseInt($('stTimer').value, 10) || 600;
+  }
+
+  const id = await rpcSaveStage({
+    id: S.editingStage ? S.editingStage.id : null,
+    scenario_slug: S.scenario.slug,
+    title: title,
+    rule_type: $('stRuleType').value,
+    sort_order: S.editingStage ? S.editingStage.sort_order : S.stages.length,
+    settings: settings
+  });
+
+  if (id > 0) {
+    toast('✅ Этап сохранён');
+    $('ovStageEdit').hidden = true;
+    if (!S.editingStage) {
+      S.stages.push({ id, title, rule_type: $('stRuleType').value, sort_order: S.stages.length, settings });
+    } else {
+      Object.assign(S.editingStage, { title, rule_type: $('stRuleType').value, settings });
+    }
+    renderStagesEditor();
+  } else {
+    toast('❌ Ошибка сохранения этапа');
+  }
+};
+
+$('stCancel').onclick = () => { $('ovStageEdit').hidden = true; };
+
+$('stDelete').onclick = async () => {
+  if (!S.editingStage) return;
+  if (!confirm('Удалить этот этап? Точки останутся без этапа.')) return;
+  
+  const ok = await fetch(CONFIG.supabaseUrl + '/rest/v1/stages?id=eq.' + S.editingStage.id, {
+    method: 'DELETE',
+    headers: { apikey: CONFIG.supabaseAnonKey, Authorization: 'Bearer ' + CONFIG.supabaseAnonKey }
+  }).then(r => r.ok);
+  
+  if (ok) {
+    S.stages = S.stages.filter(s => s.id !== S.editingStage.id);
+    S.points.forEach(p => { if (p.stage_id === S.editingStage.id) p.stage_id = null; });
+    $('ovStageEdit').hidden = true;
+    renderStagesEditor();
+    renderDebug();
+    toast('🗑 Этап удалён');
+  }
+};
+
+// 4. Обновлённое открытие окна точки (теперь с выбором этапа!)
+function openPointEditor(point, stageId) {
+  S.editingPoint = point;
+  
+  // Заполняем выпадающий список этапов
+  const stageSelect = $('edStageId');
+  stageSelect.innerHTML = '<option value="">-- Без этапа --</option>';
+  S.stages.forEach(st => {
+    const opt = document.createElement('option');
+    opt.value = st.id;
+    opt.textContent = `${st.title} (${st.rule_type || st.kind})`;
+    stageSelect.appendChild(opt);
+  });
+
+  if (point) {
+    $('pointEditTitle').textContent = '✏️ Редактировать точку';
+    $('edTitle').value = point.title || '';
+    $('edLat').value = point.lat || '';
+    $('edLng').value = point.lng || '';
+    $('edDesc').value = point.desc || '';
+    $('edAnswer').value = point.answer || '';
+    $('edHint').value = point.hint || '';
+    $('edComment').value = point.comment || '';
+    $('edRadius').value = point.radius || CONFIG.arriveRadius;
+    $('edStageId').value = point.stage_id || ''; // <-- Ключевое: выбираем текущий этап
+  } else {
+    $('pointEditTitle').textContent = '➕ Новая точка';
+    $('edTitle').value = '';
+    $('edLat').value = S.pos ? S.pos[0].toFixed(6) : '';
+    $('edLng').value = S.pos ? S.pos[1].toFixed(6) : '';
+    $('edDesc').value = '';
+    $('edAnswer').value = '';
+    $('edHint').value = '';
+    $('edComment').value = '';
+    $('edRadius').value = CONFIG.arriveRadius;
+    $('edStageId').value = stageId || ''; // Сразу выбираем этап, из которого нажали "+"
+  }
+  $('ovPointEdit').hidden = false;
+}
+
+// 5. Сохранение точки (учитывает новый stage_id из выпадающего списка)
 $('edSavePoint').onclick = async () => {
-  const point = S.editingPoint || {
-    id: null,
-    stage_id: S.editingStageId,
-    stage_order: 999 // триггер пересчитает
-  };
+  const point = S.editingPoint || { id: null, stage_order: 999 };
   
   Object.assign(point, {
     title: $('edTitle').value.trim(),
@@ -611,27 +738,49 @@ $('edSavePoint').onclick = async () => {
     answer: $('edAnswer').value,
     hint: $('edHint').value,
     comment: $('edComment').value,
-    radius: parseInt($('edRadius').value, 10) || CONFIG.arriveRadius
+    radius: parseInt($('edRadius').value, 10) || CONFIG.arriveRadius,
+    stage_id: $('edStageId').value ? parseInt($('edStageId').value, 10) : null, // <-- Берём из списка
+    scenario_slug: S.scenario.slug
   });
+  
+  if (!point.title || !isFinite(point.lat) || !isFinite(point.lng)) {
+    toast('⚠️ Заполни название и координаты'); return;
+  }
+
   const pass = sessionStorage.getItem('gq_editor_pass') || '';
   const id = await rpcSaveQuest(point, pass);
-  if (id === -1) {
-    toast('❌ Неверный пароль');
-    return;
-  }
-  if (point.id == null) {
-    point.id = id;
-    S.points.push(point);
-  }
+  
+  if (id === -1) { sessionStorage.removeItem('gq_editor_pass'); toast('❌ Неверный пароль'); return; }
+  if (id === -2) { toast('⚠️ Ошибка связи с БД'); return; }
+  
+  if (point.id == null) { point.id = id; S.points.push(point); }
+  else { const q = S.points.find(x => String(x.id) === String(point.id)); if (q) Object.assign(q, point); }
+  
   $('ovPointEdit').hidden = true;
   renderStagesEditor();
+  renderDebug();
   updateGame();
-  toast('✅ Точка сохранена');
+  toast('💾 Точка сохранена');
 };
 
-$('edCancelPoint').onclick = () => {
-  $('ovPointEdit').hidden = true;
-};
+$('edCancelPoint').onclick = () => { $('ovPointEdit').hidden = true; };
+
+// 6. RPC для сохранения этапа
+async function rpcSaveStage(stageData) {
+  try {
+    const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/rpc/save_stage', {
+      method: 'POST',
+      headers: { apikey: CONFIG.supabaseAnonKey, Authorization: 'Bearer ' + CONFIG.supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify(stageData)
+    });
+    if (!r.ok) return -1;
+    return await r.json();
+  } catch (e) { return -1; }
+}
+
+// 7. Привязываем кнопку "+ Новый этап" к новой функции (вместо prompt)
+$('btnAddStage').onclick = () => openStageEditor(null);
+/* ========================================================== */
 
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
