@@ -1866,9 +1866,16 @@ $('startCode').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnStart').c
 $('passInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('btnPassOk').click();});
 $('btnAdd').onclick=()=>{if(!S.debug){toast('Сначала включи 🐞 Отладку.');return;}const c=map.getCenter();const mx=Math.max(0,...S.points.map(q=>q.order));openEditor({id:null,title:'',lat:+c.lat.toFixed(6),lng:+c.lng.toFixed(6),desc:'',answer:'',hint:'',comment:'',order:mx+10,kind:'main',radius:CONFIG.arriveRadius});};
 $('btnDel').onclick=()=>{if(!S.debug){toast('Сначала включи 🐞 Отладку.');return;}S.delMode=!S.delMode;$('btnDel').classList.toggle('on',S.delMode);renderDebug();toast(S.delMode?'➖ Режим удаления: кликни по точке. Ещё раз — выход.':'➖ Режим удаления выключен.');};
-$('edSave').onclick=editorSave;
-$('edDelete').onclick=editorDelete;
-$('edCancel').onclick=()=>{$('ovEdit').hidden=true;S.editing=null;};
+$('edCancel').onclick = () => {
+  $('ovEdit').hidden = true;
+  S.debug = false;
+  $('btnDebug').classList.remove('on');
+  $('btnAdd').hidden = true;
+  $('btnDel').hidden = true;
+  $('btnTest').hidden = true;
+  renderDebug();
+  updateGame();
+};
 $('btnBonusStart').onclick=startBonus;
 $('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
 $('btnBonusGo').onclick=startBonus;
