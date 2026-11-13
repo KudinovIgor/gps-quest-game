@@ -193,30 +193,46 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
  <button id="btnPassCancel" class="sec">Отмена</button>
 </div></div>
 
-<div id="ovEdit" class="overlay" hidden><div class="box">
- <h2 id="edHead">✏️ Точка</h2>
- <div class="ed">
-  <div><label>Название</label><input id="edTitle"></div>
-  <div class="row">
-   <div><label>Широта</label><input id="edLat" inputmode="decimal"></div>
-   <div><label>Долгота</label><input id="edLng" inputmode="decimal"></div>
+<div id="ovEdit" class="overlay" hidden>
+  <div class="box" style="max-width:90vw;max-height:90vh;overflow:auto">
+    <h2 id="edHead">📋 Этапы квеста</h2>
+    <!-- Список этапов -->
+    <div id="stagesList"></div>
+    <!-- Кнопка добавления этапа -->
+    <button id="btnAddStage" class="chip" style="margin-top:10px">+ Новый этап</button>
+    <button id="edCancel" class="sec" style="margin-top:10px;width:100%">Закрыть</button>
   </div>
-  <div><label>Загадка (description)</label><textarea id="edDesc" rows="2"></textarea></div>
-  <div class="row">
-   <div><label>Ответ (варианты через |)</label><input id="edAnswer"></div>
-   <div><label>Подсказка</label><input id="edHint"></div>
+</div>
+
+<!-- Редактор точки (отдельное окно) -->
+<div id="ovPointEdit" class="overlay" hidden>
+  <div class="box">
+    <h2 id="pointEditTitle">✏️ Точка</h2>
+    <div class="ed">
+      <div><label>Название</label><input id="edTitle"></div>
+      <div class="row">
+        <div><label>Широта</label><input id="edLat" inputmode="decimal"></div>
+        <div><label>Долгота</label><input id="edLng" inputmode="decimal"></div>
+      </div>
+      <div><label>Загадка</label><textarea id="edDesc" rows="2"></textarea></div>
+      <div class="row">
+        <div><label>Ответ</label><input id="edAnswer"></div>
+        <div><label>Подсказка</label><input id="edHint"></div>
+      </div>
+      <div><label>Факт после ответа</label><textarea id="edComment" rows="2"></textarea></div>
+      <div class="row">
+        <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <button id="btnOrderUp" type="button">⬆️</button>
+          <button id="btnOrderDown" type="button">⬇️</button>
+        </div>
+      </div>
+      <button id="edSavePoint">💾 Сохранить</button>
+      <button id="edDeletePoint" class="sec">🗑 Удалить</button>
+      <button id="edCancelPoint" class="sec">Отмена</button>
+    </div>
   </div>
-  <div><label>Комментарий-факт после верного ответа</label><textarea id="edComment" rows="2"></textarea></div>
-  <div class="row">
-   <div><label>Порядок</label><input id="edOrder" inputmode="numeric"></div>
-   <div><label>Тип</label><select id="edKind"><option value="main">main</option><option value="bonus">bonus</option><option value="foxhunter">foxhunter</option><option value="story">story</option></select></div>
-   <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
-  </div>
-  <button id="edSave">💾 Сохранить в БД</button>
-  <button id="edDelete" class="sec">🗑 Удалить точку</button>
-  <button id="edCancel" class="sec">Отмена</button>
- </div>
-</div></div>
+</div>
 <div id="ovStory" class="overlay" hidden><div class="box">
 
  <h2 id="storyTitle">📜 История</h2>
@@ -481,6 +497,142 @@ function captureFox(q){
   renderFoxSel();
   if(!foxes().some(x=>!S.opened.has(String(x.id))))S.foxDonePending=true;  // поймали ПОСЛЕДНЮЮ лису — запланировать праздник
 }
+
+function renderStagesEditor() {
+  const container = $('stagesList');
+  container.innerHTML = '';
+  
+  S.stages.forEach((stage, idx) => {
+    const stageEl = document.createElement('div');
+    stageEl.className = 'stage-accordion';
+    stageEl.style.cssText = 'border:1px solid #1d4a63;border-radius:8px;margin:8px 0;overflow:hidden';
+    
+    // Заголовок этапа (кликабельный)
+    const header = document.createElement('div');
+    header.style.cssText = 'background:#102a3c;padding:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
+    header.innerHTML = `
+      <span><b>Э${idx + 1}.</b> ${stage.title} (${stage.rule_type})${stage.settings?.global_timer ? ' ⏱ ' + Math.floor(stage.settings.global_timer / 60) + ' мин' : ''}</span>
+      <span class="toggle">▶</span>
+    `;
+    
+    // Список точек этапа (скрыт по умолчанию)
+    const pointsList = document.createElement('div');
+    pointsList.style.cssText = 'background:#0d1626;padding:10px;display:none';
+    
+    const stagePoints = S.points
+      .filter(p => p.stage_id === stage.id)
+      .sort((a, b) => a.stage_order - b.stage_order);
+    
+    stagePoints.forEach((p, pIdx) => {
+      const pointEl = document.createElement('div');
+      pointEl.style.cssText = 'padding:8px;border-bottom:1px solid #16324a;cursor:pointer;display:flex;justify-content:space-between';
+      pointEl.innerHTML = `<span>📍 ${pIdx + 1}. ${p.title}</span><span>✏️</span>`;
+      pointEl.onclick = () => openPointEditor(p, stage.id);
+      pointsList.appendChild(pointEl);
+    });
+    
+    // Кнопка добавления точки в этот этап
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ Точка';
+    addBtn.style.cssText = 'width:100%;margin-top:8px;background:#102a3c;border:1px dashed #1d4a63;color:#8ab4d8;padding:8px;border-radius:6px;cursor:pointer';
+    addBtn.onclick = () => openPointEditor(null, stage.id);
+    pointsList.appendChild(addBtn);
+    
+    // Раскрытие/скрытие
+    header.onclick = () => {
+      const isOpen = pointsList.style.display !== 'none';
+      pointsList.style.display = isOpen ? 'none' : 'block';
+      header.querySelector('.toggle').textContent = isOpen ? '▶' : '▼';
+    };
+    
+    stageEl.appendChild(header);
+    stageEl.appendChild(pointsList);
+    container.appendChild(stageEl);
+  });
+}
+
+function openPointEditor(point, stageId) {
+  S.editingPoint = point;
+  S.editingStageId = stageId;
+  
+  if (point) {
+    $('pointEditTitle').textContent = '✏️ Редактировать точку';
+    $('edTitle').value = point.title || '';
+    $('edLat').value = point.lat || '';
+    $('edLng').value = point.lng || '';
+    $('edDesc').value = point.desc || '';
+    $('edAnswer').value = point.answer || '';
+    $('edHint').value = point.hint || '';
+    $('edComment').value = point.comment || '';
+    $('edRadius').value = point.radius || CONFIG.arriveRadius;
+  } else {
+    $('pointEditTitle').textContent = '➕ Новая точка';
+    $('edTitle').value = '';
+    $('edLat').value = '';
+    $('edLng').value = '';
+    $('edDesc').value = '';
+    $('edAnswer').value = '';
+    $('edHint').value = '';
+    $('edComment').value = '';
+    $('edRadius').value = CONFIG.arriveRadius;
+  }
+  
+  $('ovPointEdit').hidden = false;
+}
+
+$('btnAddStage').onclick = () => {
+  const title = prompt('Название этапа:');
+  if (!title) return;
+  const ruleType = prompt('Тип этапа (linear/bonus/foxhunter/flashlight):', 'linear');
+  if (!ruleType) return;
+  
+  // Отправляем в БД
+  rpcSaveStage({
+    scenario_slug: S.scenario.slug,
+    title,
+    rule_type: ruleType,
+    sort_order: S.stages.length,
+    settings: {}
+  });
+};
+
+$('edSavePoint').onclick = async () => {
+  const point = S.editingPoint || {
+    id: null,
+    stage_id: S.editingStageId,
+    stage_order: 999 // триггер пересчитает
+  };
+  
+  Object.assign(point, {
+    title: $('edTitle').value.trim(),
+    lat: parseFloat($('edLat').value),
+    lng: parseFloat($('edLng').value),
+    desc: $('edDesc').value,
+    answer: $('edAnswer').value,
+    hint: $('edHint').value,
+    comment: $('edComment').value,
+    radius: parseInt($('edRadius').value, 10) || CONFIG.arriveRadius
+  });
+  const pass = sessionStorage.getItem('gq_editor_pass') || '';
+  const id = await rpcSaveQuest(point, pass);
+  if (id === -1) {
+    toast('❌ Неверный пароль');
+    return;
+  }
+  if (point.id == null) {
+    point.id = id;
+    S.points.push(point);
+  }
+  $('ovPointEdit').hidden = true;
+  renderStagesEditor();
+  updateGame();
+  toast('✅ Точка сохранена');
+};
+
+$('edCancelPoint').onclick = () => {
+  $('ovPointEdit').hidden = true;
+};
+
 /* ---------- отладка: весь маршрут с номерами и связями ---------- */
 function renderDebug(fit){
   if(debugLayer){map.removeLayer(debugLayer);debugLayer=null;}
@@ -534,18 +686,20 @@ function renderDebug(fit){
 }
 async function toggleDebug(){
   if (!S.debug) {
-    // При включении отладки запрашиваем пароль, если он ещё не введён за эту сессию
     const pass = await ensurePass();
-    if (!pass) return; // Пароль не введён или отменён, отладка не включается
+    if (!pass) return;
   }
   
   S.debug = !S.debug;
   $('btnDebug').classList.toggle('on', S.debug);
-  $('btnTest').hidden = !S.debug;
-  $('btnAdd').hidden = !S.debug;
-  $('btnDel').hidden = !S.debug;
-  $('segModes').hidden = !S.debug; // в отладке можно переключать режимы всегда
-  renderDebug();
+  
+  if (S.debug) {
+    renderStagesEditor();
+    $('ovEdit').hidden = false;
+  } else {
+    $('ovEdit').hidden = true;
+  }
+  
   updateGame();
   toast(S.debug ? '🐞 Отладка ВКЛ' : '🐞 Отладка выкл');
 }
