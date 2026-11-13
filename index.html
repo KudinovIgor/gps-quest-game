@@ -768,14 +768,30 @@ $('edCancelPoint').onclick = () => { $('ovPointEdit').hidden = true; };
 // 6. RPC для сохранения этапа
 async function rpcSaveStage(stageData) {
   try {
+    console.log('🔍 Отправляем этап:', stageData); // <-- Отладка
     const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/rpc/save_stage', {
       method: 'POST',
-      headers: { apikey: CONFIG.supabaseAnonKey, Authorization: 'Bearer ' + CONFIG.supabaseAnonKey, 'Content-Type': 'application/json' },
+      headers: { 
+        apikey: CONFIG.supabaseAnonKey, 
+        Authorization: 'Bearer ' + CONFIG.supabaseAnonKey, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(stageData)
     });
-    if (!r.ok) return -1;
-    return await r.json();
-  } catch (e) { return -1; }
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('❌ HTTP ошибка:', r.status, errText); // <-- Отладка
+      toast('⚠️ HTTP ' + r.status + ': ' + errText.substring(0, 100));
+      return -1;
+    }
+    const result = await r.json();
+    console.log('✅ Ответ от БД:', result); // <-- Отладка
+    return result;
+  } catch (e) { 
+    console.error('❌ Исключение:', e);
+    toast('⚠️ Исключение: ' + e.message);
+    return -1; 
+  }
 }
 
 // 7. Привязываем кнопку "+ Новый этап" к новой функции (вместо prompt)
