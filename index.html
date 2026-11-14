@@ -539,26 +539,7 @@ function captureFox(q){
 
 
 
-// Обновим toggleDebug, чтобы показывать/скрывать кнопку "Этапы"
-async function toggleDebug() {
-  if (!S.debug) {
-    const pass = await ensurePass();
-    if (!pass) return;
-  }
-  
-  S.debug = !S.debug;
-  $('btnDebug').classList.toggle('on', S.debug);
-  $('btnAdd').hidden = !S.debug;
-  $('btnDel').hidden = !S.debug;
-  $('btnTest').hidden = !S.debug;
-  $('btnStages').hidden = !S.debug;  // <-- добавили
 
-  // НЕ открываем ovEdit автоматически!
-  $('ovEdit').hidden = true;
- 
-  renderDebug();
-  updateGame();
-}
 function renderStagesEditor() {
   const container = $('stagesList');
   container.innerHTML = '';
@@ -883,17 +864,25 @@ function mk(q, label, cls, color) {
   m.on('click', () => { if (S.delMode) delById(q, label); else openPointEditor(q, q.stage_id); });
 }
  
-async function toggleDebug(){
+// Обновим toggleDebug, чтобы показывать/скрывать кнопку "Этапы"
+async function toggleDebug() {
   if (!S.debug) {
     const pass = await ensurePass();
     if (!pass) return;
   }
+  
   S.debug = !S.debug;
   $('btnDebug').classList.toggle('on', S.debug);
   $('btnAdd').hidden = !S.debug;
   $('btnDel').hidden = !S.debug;
   $('btnTest').hidden = !S.debug;
-  renderDebug();  // Рисуем номера точек на карте
+  $('btnStages').hidden = !S.debug;  // <-- добавили
+
+  // НЕ открываем ovEdit автоматически!
+  $('ovEdit').hidden = true;
+ 
+  renderDebug();// Рисуем номера точек на карте
+  updateGame();
   toast(S.debug ? '🐞 Отладка ВКЛ' : '🐞 Отладка выкл');
 }
  
