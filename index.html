@@ -150,7 +150,6 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
     <input id="answerInput" placeholder="Ответ..." autocomplete="off">
     <button id="answerBtn">Ответить</button>
    </div>
-   <button id="btnBonusGo" hidden>⏱ Начать бонус-рейд</button>
    <div id="hintLine" class="hint" hidden></div>
   </div>
   <button id="btnFollow" class="followBtn" title="Слежение за игроком">◎</button>
@@ -163,13 +162,6 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
  <input id="startCode" placeholder="Кодовое слово" autocomplete="off"
   style="width:100%;background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:12px;font-size:16px;margin-top:6px">
  <button id="btnStart">🔑 Ввести и начать</button>
-</div></div>
-
-<div id="ovBonus" class="overlay" hidden><div class="box">
- <h2>🏆 Все точки открыты!</h2>
- <p>Открыт бонус-рейд: <b>скрытые точки</b>, видно только на радаре, <b>10 минут</b>. Подойди к каждой — соберёшь фрагменты ключа.</p>
- <button id="btnBonusStart">⏱ Начать рейд (10:00)</button>
- <button id="btnBonusLater" class="sec">Позже</button>
 </div></div>
 
 <div id="ovWin" class="overlay" hidden><div class="box">
@@ -495,7 +487,6 @@ function presentStage(){
   if(st.kind==='story'){ if(!S.story)showStory(st.qs[0]); return; }
   if(S.story)return;                       // пока карточка открыта, режимы не дёргаем
   if(st.kind==='foxhunter'){ if(S.mode!=='fox')setMode('fox'); return; }
-  if(st.kind==='bonus'){ if(S.phase!=='bonus')$('ovBonus').hidden=false; return; }
   if(S.mode!=='map')setMode('map');
 }
 function syncFactOverlay(){
@@ -1325,24 +1316,23 @@ function renderCard(){
     $('cardTitle').textContent = '⚙️ Этапы не настроены';
     $('cardDesc').textContent = 'Включи режим 🐞 Отладка и нажми 📋 Этапы, чтобы создать этапы и распределить точки.';
     $('cardDist').textContent = '';
-    ar.hidden = true;
-    hl.hidden = true;
-    bg.hidden = true;
+    ar.hidden = true; hl.hidden = true; bg.hidden = true;
     return;
   }   
-    if(st&&st.kind==='foxhunter'){
+  if (st && (st.rule_type === 'foxhunter' || st.kind === 'foxhunter')) {
       $('cardTitle').textContent='🦊 Идёт лисий этап';
       $('cardDesc').textContent='Поймай всех лис этапа в режиме 🦊 — маршрут продолжится сам.';
       $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
     }
-    if(st&&st.kind==='story'){
+  if (st && (st.rule_type === 'story' || st.kind === 'story')) {
       $('cardTitle').textContent='📜 Страница истории';
       $('cardDesc').textContent='Читай окно истории — после «Далее» маршрут продолжится.';
       $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
     } 
-    $('cardTitle').textContent='🎉 Все основные точки открыты!';
-    $('cardDesc').textContent=bonuses().length?'Доступен бонус-рейд. Нажми кнопку, когда будешь готов.':'Бонусных точек в базе нет — добавь строки с kind=bonus.';
-    $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=!bonuses().length;return;
+  $('cardTitle').textContent = '🏁 Этап завершён';
+  $('cardDesc').textContent = 'Следующий этап начнётся автоматически, или читай карточку истории.';
+  $('cardDist').textContent = ''; ar.hidden = true; hl.hidden = true; bg.hidden = true;
+  return;
   }
   bg.hidden=true;
   let dTxt;
@@ -1426,7 +1416,6 @@ function startBonus(){
   S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
   clearInterval(S.timerId);
   S.timerId=setInterval(tick,250);tick();
-  $('ovBonus').hidden=true;
   $('ovFail').hidden=true;
   updateGame();toast('⏱ Рейд начался! У тебя 10 минут.');
 }
@@ -1584,7 +1573,7 @@ function applyScenario(meta, quests, stages, note){
   invalidateStages();
   S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={};
   clearInterval(S.timerId); S.lockRadar=false;
-  $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
+  $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
   S.stages = stages || [];
   S.points=quests;
@@ -1898,7 +1887,7 @@ $('btnReset').onclick=()=>{
   S.lockRadar=false;
   clearInterval(S.timerId);stopFoxAudio();
   if(S.mode==='fox')setMode('map');
-  $('ovWin').hidden=true;$('ovBonus').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;$('ovStory').hidden=true;
+  $('ovWin').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;$('ovStory').hidden=true;
   updateGame();
   presentStage();      // заново предъявить первый этап: story/лисы/бонус/точки
   toast('Прогресс сброшен.');
@@ -1932,9 +1921,6 @@ $('edCancel').onclick = () => {
   renderDebug();
   updateGame();
 };
-$('btnBonusStart').onclick=startBonus;
-$('btnBonusLater').onclick=()=>$('ovBonus').hidden=true;
-$('btnBonusGo').onclick=startBonus;
 $('btnFailRetry').onclick=startBonus;
 $('btnWinClose').onclick=()=>{$('ovWin').hidden=true;S.phase='main';presentStage();};
 $('btnFactNext').onclick=()=>{S.fact=null;updateGame();if(S.foxDonePending){S.foxDonePending=false;$('ovFoxDone').hidden=false;}else presentStage();}; 
