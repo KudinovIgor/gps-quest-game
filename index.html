@@ -1713,7 +1713,7 @@ async function ensurePass() {
 async function toggleDebug() {
   if (!S.debug) {
     const pass = await ensurePass();
-    if (!pass) return; // Если отменили или пароль неверный — выходим
+    if (!pass) return;
   }
   
   S.debug = !S.debug;
@@ -1721,13 +1721,10 @@ async function toggleDebug() {
   $('btnAdd').hidden = !S.debug;
   $('btnDel').hidden = !S.debug;
   $('btnTest').hidden = !S.debug;
+  $('btnStages').hidden = !S.debug; // Показываем кнопку "Этапы" только в отладке
   
-  if (S.debug) {
-    renderStagesEditor();
-    $('ovEdit').hidden = false;
-  } else {
-    $('ovEdit').hidden = true;
-  }
+  // ЯВНО закрываем окно этапов, чтобы оно не вылезало само!
+  $('ovEdit').hidden = true;
   
   renderDebug();
   updateGame();
