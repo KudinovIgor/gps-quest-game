@@ -337,10 +337,14 @@ const dirName=d=>DIRS[Math.round(d/45)%8];
 const fmtDist=m=>m<1000?Math.round(m)+' м':(m/1000).toFixed(1)+' км';
 const normAns=s=>(s||'').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 
-const mains=()=>S.points.filter(q=>q.kind==='main');
-const bonuses=()=>S.points.filter(q=>q.kind==='bonus');
-const foxes=()=>S.points.filter(q=>q.kind==='foxhunter');
-const stories=()=>S.points.filter(q=>q.kind==='story');
+const getPointsByType = (type) => S.points.filter(q => 
+  q.kind === type || (q.stage_id && S.stages?.find(s => s.id === q.stage_id)?.rule_type === type)
+);
+const mains = () => getPointsByType('main') || getPointsByType('linear');
+const bonuses = () => getPointsByType('bonus');
+const foxes = () => getPointsByType('foxhunter');
+const stories = () => getPointsByType('story');
+ 
 const target=()=>{
  const st=currentStage();
  if(!st||st.kind!=='main')
@@ -835,121 +839,48 @@ function renderDebug(fit) {
  
   debugLayer = L.layerGroup().addTo(map);
   
-  // Цвета для разных типов этапов
-  const PAL = {
-    linear: '#ffc857',      // жёлтый — обычные точки
-    bonus: '#6c9bd2',       // синий — бонусы
-    foxhunter: '#c77dff',   // фиолетовый — лисы
-    story: '#8ab4f8',       // голубой — истории
-    flashlight: '#00e5ff',  // бирюзовый — фонарик
-    sequence: '#ff5470'     // красный — строгая последовательность
-  };
+  const PAL = { linear: '#ffc857', bonus: '#6c9bd2', foxhunter: '#c77dff', story: '#8ab4f8', flashlight: '#00e5ff', sequence: '#ff5470' };
   
-  // Рисуем этапы и их точки
+  // 1. Рисуем этапы и их точки
   if (S.stages && S.stages.length) {
     S.stages.forEach((stage, stageIdx) => {
-      const stagePoints = S.points
-        .filter(p => p.stage_id === stage.id)
-        .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
-      
+      const stagePoints = S.points.filter(p => p.stage_id === stage.id).sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
       const col = PAL[stage.rule_type] || '#8ab4f8';
       
-      // Если точек больше одной — рисуем описывающую окружность и центр
       if (stagePoints.length > 1) {
         const centerLat = stagePoints.reduce((sum, p) => sum + p.lat, 0) / stagePoints.length;
         const centerLng = stagePoints.reduce((sum, p) => sum + p.lng, 0) / stagePoints.length;
-        const center = [centerLat, centerLng];
-        
-        // Описывающая окружность
         const maxDist = Math.max(...stagePoints.map(p => distM(centerLat, centerLng, p.lat, p.lng)));
-        L.circle(center, {
-          radius: maxDist,
-          color: col,
-          weight: 2,
-          opacity: .85,
-          dashArray: '8 6',
-          fillColor: col,
-          fillOpacity: .06,
-          interactive: false
-        }).addTo(debugLayer);
         
-        // Маркер центра этапа
-        L.marker(center, {
-          icon: L.divIcon({
-            className: '',
-            html: '<div class="dbg stage" style="background:' + col + ';color:#0a1420">Э' + (stageIdx + 1) + '</div>',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
-          }),
-          zIndexOffset: 400
-        })
-          .bindTooltip('Э' + (stageIdx + 1) + ': ' + stage.title + ' (' + stage.rule_type + ') | точек: ' + stagePoints.length, {
-            direction: 'top',
-            offset: [0, -14]
-          })
-          .addTo(debugLayer);
-        
-        // Радиальные спицы для бонусов и лис
-        if (stage.rule_type === 'foxhunter' || stage.rule_type === 'bonus') {
-          stagePoints.forEach(q => {
-            L.polyline([center, [q.lat, q.lng]], {
-              color: col,
-              weight: 1.5,
-              opacity: .55,
-              interactive: false
-            }).addTo(debugLayer);
-          });
-        }
+        L.circle([centerLat, centerLng], { radius: maxDist, color: col, weight: 2, opacity: .85, dashArray: '8 6', fillColor: col, fillOpacity: .06, interactive: false }).addTo(debugLayer);
+        L.marker([centerLat, centerLng], { icon: L.divIcon({ className: '', html: '<div class="dbg stage" style="background:' + col + ';color:#0a1420">Э' + (stageIdx + 1) + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 400 })
+          .bindTooltip('Э' + (stageIdx + 1) + ': ' + stage.title, { direction: 'top', offset: [0, -14] }).addTo(debugLayer);
       }
       
-      // Рисуем точки этапа
-      stagePoints.forEach((q, pointIdx) => {
-        const label = (stageIdx + 1) + '.' + (pointIdx + 1);
-        mk(q, label, '', col);
-      });
+      stagePoints.forEach((q, pointIdx) => mk(q, (stageIdx + 1) + '.' + (pointIdx + 1), '', col));
     });
   }
   
-  // Точки без этапа — рисуем серым
+  // 2. Рисуем точки БЕЗ этапа (серые)
   const orphanPoints = S.points.filter(p => !p.stage_id);
-  orphanPoints.forEach((q, i) => {
-    mk(q, '?' + (i + 1), 'orphan', '#667');
-  });
+  orphanPoints.forEach((q, i) => mk(q, '?' + (i + 1), 'orphan', '#666'));
   
-  // Фит карты если нужно
+  // 3. Фит карты
   const all = S.points.map(q => [q.lat, q.lng]);
   if (fit && all.length) map.fitBounds(L.latLngBounds(all), { padding: [50, 50] });
 }
 
-// Вспомогательная функция для создания маркера точки
+// Вспомогательная функция (должна быть СРАЗУ ПОСЛЕ renderDebug)
 function mk(q, label, cls, color) {
   const m = L.marker([q.lat, q.lng], {
-    icon: L.divIcon({
-      className: '',
-      html: '<div class="dbg ' + cls + (S.delMode ? ' del' : '') + '" style="border-color:' + color + '">' + label + '</div>',
-      iconSize: [24, 24],
-      iconAnchor: [12, 12]
-    }),
-    zIndexOffset: 500,
-    draggable: true
+    icon: L.divIcon({ className: '', html: '<div class="dbg ' + cls + (S.delMode ? ' del' : '') + '" style="border-color:' + color + '">' + label + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] }),
+    zIndexOffset: 500, draggable: true
   })
-    .bindTooltip(label + '. ' + q.title + ' | stage_order=' + (q.stage_order || 0) + ' | id=' + q.id + ' | тяни=перенос, клик=редактор', {
-      direction: 'top',
-      offset: [0, -10]
-    })
-    .addTo(debugLayer);
-    
-  m.on('dragend', () => {
-    const p = m.getLatLng();
-    q.lat = p.lat;
-    q.lng = p.lng;
-    onQuestMoved(q, label);  // <-- Используем твою существующую функцию
-  });
-  
-  m.on('click', () => {
-    if (S.delMode) delById(q, label);
-    else openPointEditor(q, q.stage_id);  // <-- Используем функцию из Шага 3
-  });
+  .bindTooltip(label + '. ' + q.title + ' | id=' + q.id + ' | тяни=перенос, клик=редактор', { direction: 'top', offset: [0, -10] })
+  .addTo(debugLayer);
+
+  m.on('dragend', () => { const p = m.getLatLng(); q.lat = p.lat; q.lng = p.lng; onQuestMoved(q, label); });
+  m.on('click', () => { if (S.delMode) delById(q, label); else openPointEditor(q, q.stage_id); });
 }
  
 async function toggleDebug(){
@@ -1242,20 +1173,31 @@ function updateGame(){
   const cst=currentStage();
   const total = S.stages && S.stages.length ? S.points.filter(p => p.stage_id).length : S.points.length;
   $('progress').textContent = '🚩 ' + om + '/' + total + (S.phase === 'bonus' ? ' 🔑 ' + bs.filter(q => S.opened.has(String(q.id))).length + '/' + bs.length : '') + (S.debug && cst ? ' · Э' + cst.idx : '');
-  const mst=$('modeStatus');
-  if(S.phase==='won')mst.textContent='🏁 Квест завершён!';
-  else if(S.story)mst.textContent='📜 Страница истории';
-  else if(S.fact)mst.textContent='✅ Загадка решена — читай факт';
-  else if(S.foxQuiz)mst.textContent='🦊 Лиса в ловушке — загадка!';
-  else if(S.bonusQuiz)mst.textContent='🔎 Бонусная точка — загадка!';
-  else if(S.phase==='bonus')mst.textContent='📡 Бонус-рейд: работаем по радару';
-  else if(cst&&cst.kind==='foxhunter')mst.textContent='🦊 Охота на лис: поймано '+foxes().filter(q=>S.opened.has(String(q.id))).length+'/'+foxes().length;
-  else if(cst&&cst.kind==='bonus')mst.textContent='📡 Бонус-рейд доступен — начни, когда готов';
-  else if(cst)mst.textContent='🗺 Маршрут: этап Э'+cst.idx;
-  else mst.textContent=S.points.length?'🏁 Весь маршрут пройден!':'';
-  if(S.debug&&S.points.length){
-    const km=routeKm();
-    mst.textContent+=' · 📏 '+km.toFixed(1)+' км'+(km>10?' ⚠️ много!':'');
+  const mst = $('modeStatus');
+  if (S.phase === 'won') mst.textContent = '🏁 Квест завершён!';
+  else if (S.story) mst.textContent = '📜 Страница истории';
+  else if (S.fact) mst.textContent = '✅ Загадка решена — читай факт';
+  else if (S.foxQuiz) mst.textContent = '🦊 Лиса в ловушке — загадка!';
+  else if (S.bonusQuiz) mst.textContent = '🔎 Бонусная точка — загадка!';
+  else if (S.phase === 'bonus') mst.textContent = '📡 Бонус-рейд: работаем по радару';
+  else {
+    const cst = currentStage();
+    if (!cst && (!S.stages || !S.stages.length)) {
+      mst.textContent = '⚙️ Этапы не настроены. Включи 🐞 и нажми 📋 Этапы';
+    } else if (cst && cst.rule_type === 'foxhunter') {
+      mst.textContent = '🦊 Охота на лис: поймано ' + foxes().filter(q => S.opened.has(String(q.id))).length + '/' + foxes().length;
+    } else if (cst && cst.rule_type === 'bonus') {
+      mst.textContent = '📡 Бонус-рейд доступен — начни, когда готов';
+    } else if (cst) {
+      mst.textContent = '🗺 Маршрут: этап Э' + (S.stages.indexOf(cst) + 1);
+    } else {
+      mst.textContent = S.points.length ? '🏁 Все точки открыты!' : '';
+    }
+    
+    if (S.debug && S.points.length) {
+      const km = routeKm();
+      mst.textContent += ' · 📏 ' + km.toFixed(1) + ' км' + (km > 10 ? ' ⚠️ много!' : '');
+    }
   }
   if(S.phase==='bonus'&&S.pos&&!S.bonusQuiz&&!S.fact){
     for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
