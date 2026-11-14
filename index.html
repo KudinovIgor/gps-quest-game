@@ -1376,6 +1376,16 @@ function renderCard(){
   const t=target();
   if(!t){
     const st=currentStage();
+  // Если этапов вообще нет — показываем правильное сообщение
+  if (!S.stages || !S.stages.length) {
+    $('cardTitle').textContent = '⚙️ Этапы не настроены';
+    $('cardDesc').textContent = 'Включи режим 🐞 Отладка и нажми 📋 Этапы, чтобы создать этапы и распределить точки.';
+    $('cardDist').textContent = '';
+    ar.hidden = true;
+    hl.hidden = true;
+    bg.hidden = true;
+    return;
+  }   
     if(st&&st.kind==='foxhunter'){
       $('cardTitle').textContent='🦊 Идёт лисий этап';
       $('cardDesc').textContent='Поймай всех лис этапа в режиме 🦊 — маршрут продолжится сам.';
