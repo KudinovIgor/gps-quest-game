@@ -25,6 +25,15 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #geoStatus.ok{color:var(--gr)}#geoStatus.wait{color:var(--warn)}#geoStatus.err{color:var(--err)}
 #modeStatus{padding:4px 10px;font-size:12px;background:#0a1a2a;border-bottom:1px solid #16324a;color:var(--txt)}
 #views{position:relative;flex:1;min-height:0}
+/* Фикс для окна редактирования точки */
+#ovPointEdit .box {max-height: calc(100vh - 32px);padding: 16px;overflow: hidden; display: flex; flex-direction: column}
+#ovPointEdit .ed {overflow-y: auto;  overflow-x: hidden;  flex: 1;  padding-right: 8px; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch}
+#ovPointEdit .ed::-webkit-scrollbar {  width: 6px}
+#ovPointEdit .ed::-webkit-scrollbar-track {  background: transparent}
+#ovPointEdit .ed::-webkit-scrollbar-thumb {  background: #1d4a63;  border-radius: 3px}
+@media (max-width: 600px) {  #ovPointEdit .ed::-webkit-scrollbar {    width: 0  }
+  #ovPointEdit .ed {padding-right: 4px}
+}
 #map{position:absolute;inset:0}
 .leaflet-control-attribution{font-size:9px;opacity:.6}
 #radarView{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;overflow:auto;background:radial-gradient(circle at 50% 40%,#0a1a2a 0%,#070b12 70%)}
@@ -250,13 +259,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
       <div><label>Этап</label>
         <select id="edStageId" style="background:#071019;border:1px solid #1d4a63;color:var(--txt);border-radius:8px;padding:8px;width:100%"></select>
       </div>
-      <div class="row">
-        <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          <button id="btnOrderUp" type="button">⬆️</button>
-          <button id="btnOrderDown" type="button">⬇️</button>
-        </div>
-      </div>
+      <div><label>Радиус, м</label><input id="edRadius" inputmode="numeric"></div>
       <button id="edSavePoint">💾 Сохранить</button>
       <button id="edDeletePoint" class="sec">🗑 Удалить</button>
       <button id="edCancelPoint" class="sec">Отмена</button>
@@ -595,7 +598,14 @@ function renderStagesEditor() {
 
 function openPointEditor(point, stageId) {
   S.editingPoint = point;
-  S.editingStageId = stageId;
+  const stageSelect = $('edStageId');
+  stageSelect.innerHTML = '<option value="">-- Без этапа --</option>';
+  (S.stages || []).forEach(st => {
+    const opt = document.createElement('option');
+    opt.value = st.id;
+    opt.textContent = `Э${S.stages.indexOf(st) + 1}. ${st.title} (${st.rule_type})`;
+    stageSelect.appendChild(opt);
+  });
   
   if (point) {
     $('pointEditTitle').textContent = '✏️ Редактировать точку';
@@ -607,6 +617,7 @@ function openPointEditor(point, stageId) {
     $('edHint').value = point.hint || '';
     $('edComment').value = point.comment || '';
     $('edRadius').value = point.radius || CONFIG.arriveRadius;
+    $('edStageId').value = point.stage_id || '';
   } else {
     $('pointEditTitle').textContent = '➕ Новая точка';
     $('edTitle').value = '';
@@ -617,8 +628,8 @@ function openPointEditor(point, stageId) {
     $('edHint').value = '';
     $('edComment').value = '';
     $('edRadius').value = CONFIG.arriveRadius;
+    $('edStageId').value = stageId || '';
   }
-  
   $('ovPointEdit').hidden = false;
 }
 
