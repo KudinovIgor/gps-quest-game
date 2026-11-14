@@ -164,6 +164,13 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
  <button id="btnStart">🔑 Ввести и начать</button>
 </div></div>
 
+<div id="ovBonus" class="overlay" hidden><div class="box">
+ <h2>🏆 Все точки открыты!</h2>
+ <p id="ovBonusDesc">Открыт бонус-рейд: <b>скрытые точки</b>, видно только на радаре. Подойди к каждой — соберёшь фрагменты ключа.</p>
+ <button id="btnBonusStart">⏱ Начать рейд</button>
+ <button id="btnBonusLater" class="sec">Позже</button>
+</div></div>
+
 <div id="ovWin" class="overlay" hidden><div class="box">
  <h2>🔑 Ключ собран!</h2>
  <p>Ты успела по времени. Ты — легенда!</p>
@@ -487,6 +494,12 @@ function presentStage(){
   if(st.kind==='story'){ if(!S.story)showStory(st.qs[0]); return; }
   if(S.story)return;                       // пока карточка открыта, режимы не дёргаем
   if(st.kind==='foxhunter'){ if(S.mode!=='fox')setMode('fox'); return; }
+  // Если этап бонусный — показываем окно с правилами
+  if (stage.rule_type === 'bonus' || stage.kind === 'bonus') {
+    updateBonusUI();
+    $('ovBonus').hidden = false;
+    return; // Ждём, пока пользователь нажмёт "Начать рейд"
+  }
   if(S.mode!=='map')setMode('map');
 }
 function syncFactOverlay(){
@@ -1407,17 +1420,54 @@ function tick(){
   el.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
   el.classList.toggle('danger',left<60000);
 }
-function startBonus(){
-  S.phase='bonus';
-  S.fact=null;
-  S.bonusQuiz=null
-  S.lockRadar=true;
+
+function updateBonusUI() {
+  // Ищем этап бонуса
+  const bonusStage = S.stages?.find(s => s.rule_type === 'bonus' || s.kind === 'bonus');
+  const seconds = bonusStage?.settings?.global_timer || CONFIG.bonusSeconds;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  const timeStr = String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+  
+  // Обновляем текст в окне
+  const desc = $('ovBonus')?.querySelector('p');
+  if (desc) {
+    desc.innerHTML = `Открыт бонус-рейд: <b>скрытые точки</b>, видно только на радаре, <b>${minutes} мин ${secs > 0 ? secs + ' сек' : ''}</b>. Подойди к каждой — соберёшь фрагменты ключа.`;
+  }
+  
+  const btnStart = $('btnBonusStart');
+  if (btnStart) btnStart.textContent = `⏱ Начать рейд (${timeStr})`;
+  
+  const btnGo = $('btnBonusGo');
+  if (btnGo) btnGo.textContent = `⏱ Начать бонус-рейд (${timeStr})`;
+  
+  const timer = $('bonusTimer');
+  if (timer) timer.textContent = timeStr;
+}
+  
+function startBonus() {
+  S.phase = 'bonus';
+  S.fact = null;
+  S.bonusQuiz = null;
+  S.lockRadar = true;
   setMode('radar');
-  S.bonusEndsAt=Date.now()+CONFIG.bonusSeconds*1000;
+  
+  // Берём время из настроек этапа бонуса
+  const bonusStage = S.stages?.find(s => s.rule_type === 'bonus' || s.kind === 'bonus');
+  const timeLimit = bonusStage?.settings?.global_timer || CONFIG.bonusSeconds;
+  
+  S.bonusEndsAt = Date.now() + timeLimit * 1000;
   clearInterval(S.timerId);
-  S.timerId=setInterval(tick,250);tick();
-  $('ovFail').hidden=true;
-  updateGame();toast('⏱ Рейд начался! У тебя 10 минут.');
+  S.timerId = setInterval(tick, 250);
+  tick();
+  
+  $('ovBonus').hidden = true;
+  $('ovFail').hidden = true;
+  updateGame();
+  
+  const minutes = Math.floor(timeLimit / 60);
+  const secs = timeLimit % 60;
+  toast(`⏱ Рейд начался! У тебя ${minutes} мин ${secs > 0 ? secs + ' сек' : ''}.`);
 }
 function win(){
   S.phase='won';
@@ -1585,7 +1635,7 @@ function applyScenario(meta, quests, stages, note){
   const all=S.points.map(q=>[q.lat,q.lng]);
   if(all.length&&!S.debug){ map.fitBounds(L.latLngBounds(all),{padding:[60,60]}); S.centered=false; }
   if(note)toast(note,8000);
-  updateGame(); renderDebug(true);
+  updateGame(); renderDebug(true);  updateBonusUI();
   if(!S.points.length)toast('⚠️ В сценарии нет точек.',12000);
   presentStage();
 }
