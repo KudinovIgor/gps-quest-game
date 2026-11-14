@@ -103,9 +103,9 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
    <button id="btnRadar">📡 Радар</button>
    <button id="btnFox">🦊 Охота</button>
   </div>
-  <button id="btnStages" class="chip" title="Управление этапами" hidden>📋 Этапы</button>
   <button id="btnTest" class="chip" title="Тест-режим: клик по карте = телепорт" hidden>🧪 Тест</button>
   <button id="btnDebug" class="chip" title="Отладка: номера точек и связи маршрута">🐞 Отладка</button>
+  <button id="btnStages" class="chip" title="Управление этапами" hidden>📋 Этапы</button>
   <button id="btnAdd" class="chip" title="Добавить точку (в режиме отладки)" hidden>➕</button>
   <button id="btnDel" class="chip" title="Режим удаления: клик по точке (в отладке)" hidden>➖</button>
   <button id="btnCode" class="chip" title="Ввести код">🔑 Код</button>
@@ -531,12 +531,8 @@ function captureFox(q){
   if(!foxes().some(x=>!S.opened.has(String(x.id))))S.foxDonePending=true;  // поймали ПОСЛЕДНЮЮ лису — запланировать праздник
 }
 
- $('btnStages').hidden = !S.debug;  // показываем только в режиме отладки
 
-$('btnStages').onclick = () => {
-  renderStagesEditor();
-  $('ovEdit').hidden = false;
-};
+
 
 // Обновим toggleDebug, чтобы показывать/скрывать кнопку "Этапы"
 async function toggleDebug() {
@@ -551,7 +547,10 @@ async function toggleDebug() {
   $('btnDel').hidden = !S.debug;
   $('btnTest').hidden = !S.debug;
   $('btnStages').hidden = !S.debug;  // <-- добавили
-  
+
+  // НЕ открываем ovEdit автоматически!
+  $('ovEdit').hidden = true;
+ 
   renderDebug();
   updateGame();
 }
@@ -913,7 +912,7 @@ function renderDebug(fit) {
   // Точки без этапа — рисуем серым
   const orphanPoints = S.points.filter(p => !p.stage_id);
   orphanPoints.forEach((q, i) => {
-    mk(q, '?' + (i + 1), 'orphan', '#666');
+    mk(q, '?' + (i + 1), 'orphan', '#667');
   });
   
   // Фит карты если нужно
@@ -1935,6 +1934,10 @@ $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('
 $('btnFollow').onclick=()=>{S.follow=!S.follow;updateFollowBtn();if(S.follow&&S.pos)map.panTo(S.pos,{animate:true,duration:0.6});};
 updateFollowBtn();
 $('btnDebug').onclick=toggleDebug;
+$('btnStages').onclick = () => {
+  renderStagesEditor();
+  $('ovEdit').hidden = false;
+}; 
 $('btnReset').onclick=()=>{
   if(!confirm('Сбросить весь прогресс?'))return;
   S.opened.clear();saveProg();
