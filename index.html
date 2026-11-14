@@ -1786,35 +1786,6 @@ function renderStagesEditor() {
   });
 }
 
-// 4. Открытие окна редактирования точки
-function openPointEditor(point, stageId) {
-  S.editingPoint = point;
-  S.editingStageId = stageId;
-  
-  if (point) {
-    $('pointEditTitle').textContent = '✏️ Редактировать точку';
-    $('edTitle').value = point.title || '';
-    $('edLat').value = point.lat || '';
-    $('edLng').value = point.lng || '';
-    $('edDesc').value = point.desc || '';
-    $('edAnswer').value = point.answer || '';
-    $('edHint').value = point.hint || '';
-    $('edComment').value = point.comment || '';
-    $('edRadius').value = point.radius || CONFIG.arriveRadius;
-  } else {
-    $('pointEditTitle').textContent = '➕ Новая точка';
-    $('edTitle').value = '';
-    $('edLat').value = S.pos ? S.pos[0].toFixed(6) : '';
-    $('edLng').value = S.pos ? S.pos[1].toFixed(6) : '';
-    $('edDesc').value = '';
-    $('edAnswer').value = '';
-    $('edHint').value = '';
-    $('edComment').value = '';
-    $('edRadius').value = CONFIG.arriveRadius;
-  }
-  $('ovPointEdit').hidden = false;
-}
-
 // 5. Сохранение точки из нового редактора
 $('edSavePoint').onclick = async () => {
   const point = S.editingPoint || { id: null, stage_id: S.editingStageId, stage_order: 999 };
