@@ -70,6 +70,7 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .pulse{width:36px;height:36px;border-radius:50%;background:rgba(0,229,255,.35);border:2px solid var(--cy);animation:pul 1.6s infinite}
 @keyframes pul{0%{box-shadow:0 0 0 0 rgba(0,229,255,.5)}100%{box-shadow:0 0 0 22px rgba(0,229,255,0)}}
 .dbg{width:24px;height:24px;border-radius:50%;background:var(--warn);color:#20150a;font-weight:700;font-size:12px;line-height:20px;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.6)}
+.dbg.orphan{background:#444;color:#ccc}
 .dbg.bonus{background:#6c9bd2;color:#0a1420}
 .dbg.fox{background:#c77dff;color:#1b0630}
 .dbg.del{background:var(--err);color:#fff}
@@ -1239,7 +1240,8 @@ function updateGame(){
   const ms=mains(),bs=bonuses();
   const om=ms.filter(q=>S.opened.has(String(q.id))).length;
   const cst=currentStage();
-  $('progress').textContent='🚩 '+om+'/'+ms.length+(S.phase==='bonus'?' 🔑 '+bs.filter(q=>S.opened.has(String(q.id))).length+'/'+bs.length:'')+(S.debug&&cst?' · Э'+cst.idx:'');
+  const total = S.stages && S.stages.length ? S.points.filter(p => p.stage_id).length : S.points.length;
+  $('progress').textContent = '🚩 ' + om + '/' + total + (S.phase === 'bonus' ? ' 🔑 ' + bs.filter(q => S.opened.has(String(q.id))).length + '/' + bs.length : '') + (S.debug && cst ? ' · Э' + cst.idx : '');
   const mst=$('modeStatus');
   if(S.phase==='won')mst.textContent='🏁 Квест завершён!';
   else if(S.story)mst.textContent='📜 Страница истории';
