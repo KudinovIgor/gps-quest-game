@@ -842,9 +842,9 @@ function renderDebug(fit) {
     });
   }
   
-  // 2. Рисуем точки БЕЗ этапа (серые)
-  const orphanPoints = S.points.filter(p => !p.stage_id);
-  orphanPoints.forEach((q, i) => mk(q, '?' + (i + 1), 'orphan', '#666'));
+  // 2. Точки без этапа ИЛИ с битым stage_id — рисуем серым
+  const orphanPoints = S.points.filter(p => !p.stage_id || !S.stages.some(st => st.id === p.stage_id));
+  orphanPoints.forEach((q, i) => mk(q, '?' + (i + 1), 'orphan', '#665'));
   
   // 3. Фит карты
   const all = S.points.map(q => [q.lat, q.lng]);
@@ -1569,12 +1569,13 @@ function normalizeRows(src){
     stage_id: r.stage_id
   })).filter(q => isFinite(q.lat) && isFinite(q.lng)).sort((a,b) => a.order - b.order);
 }
-function applyScenario(meta, quests, note){
+function applyScenario(meta, quests, stages, note){
   invalidateStages();
   S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={};
   clearInterval(S.timerId); S.lockRadar=false;
   $('ovBonus').hidden=true; $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
+  S.stages = stages || [];
   S.points=quests;
   S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.story=null;S.foxDonePending=false;S.bonusQuiz=null;S.foxSel=null;S.shownQid=null;
   stopFoxAudio();
@@ -1591,7 +1592,7 @@ function applyScenario(meta, quests, note){
 async function loadByCode(code, silent){
   if(normAns(code)==='demo'||normAns(code)==='демо'){
     localStorage.setItem('gq_code',code);
-    applyScenario({slug:'demo',title:'Демо (без БД)',code:code},normalizeRows(DEMO),'🧪 Загружен демо-маршрут (без базы).');
+    applyScenario({slug:'demo',title:'Демо (без БД)',code:code}, normalizeRows(DEMO), [], '🧪 Загружен демо-маршрут (без базы).');
     return true;
   }
   const url=CONFIG.supabaseUrl, key=CONFIG.supabaseAnonKey;
@@ -1603,8 +1604,7 @@ async function loadByCode(code, silent){
     const data=await r.json();
     if(!data||!data.slug){ if(!silent)toast('❌ Код не распознан.'); return false; }
     localStorage.setItem('gq_code', code);
-    applyScenario({slug:data.slug,title:data.title||data.slug,code:code}, normalizeRows(data.points||[]),
-      '🔑 Сценарий «'+(data.title||data.slug)+'» загружен!');
+    applyScenario({slug:data.slug,title:data.title||data.slug,code:code}, normalizeRows(data.points||[]), data.stages||[], '🔑 Сценарий «'+(data.title||data.slug)+'» загружен!');
     return true;
   }catch(e){ if(!silent)toast('⚠️ Не удалось проверить код: '+e.message); return false; }
 }
