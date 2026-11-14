@@ -489,19 +489,37 @@ function foxStageRange(){
   return Math.max(150,st.rM*2);   // компактный этап = чувствительный эфир
 }
 function showStory(q){S.story=q;$('storyTitle').textContent=q.title||'📜 История';$('storyText').textContent=q.desc||'';$('ovStory').hidden=false;}
-function presentStage(){
-  const st=currentStage();
-  if(!st)return;
-  if(st.kind==='story'){ if(!S.story)showStory(st.qs[0]); return; }
-  if(S.story)return;                       // пока карточка открыта, режимы не дёргаем
-  if(st.kind==='foxhunter'){ if(S.mode!=='fox')setMode('fox'); return; }
-  // Если этап бонусный — показываем окно с правилами
+function presentStage() {
+  const stage = currentStage();
+  
+  if (!stage) {
+    // Нет этапов или все завершены
+    $('cardTitle').textContent = '🏁 Квест завершён';
+    $('cardDesc').textContent = 'Спасибо за игру!';
+    $('cardDist').textContent = '';
+    $('answerRow').hidden = true;
+    $('hintLine').hidden = true;
+    $('btnBonusGo').hidden = true;
+    return;
+  }
+  // Бонусный этап — показываем окно
   if (stage.rule_type === 'bonus' || stage.kind === 'bonus') {
     updateBonusUI();
     $('ovBonus').hidden = false;
-    return; // Ждём, пока пользователь нажмёт "Начать рейд"
+    return;
   }
-  if(S.mode!=='map')setMode('map');
+  // Лисы — переключаем режим
+  if (stage.rule_type === 'foxhunter' || stage.kind === 'foxhunter') {
+    setMode('fox');
+    return;
+  }
+  // История — показываем карточку
+  if (stage.rule_type === 'story' || stage.kind === 'story') {
+    // TODO: логика показа истории
+    return;
+  }
+  // Обычный этап
+  updateGame();
 }
 function syncFactOverlay(){
   const ov=$('ovFact');
@@ -1897,18 +1915,25 @@ function invalidateStages() {
 
 function currentStage() {
   if (!S.stages || !S.stages.length) return null;
-  let stage = S.stages.find(s => s.rule_type === 'linear' || s.kind === 'linear' || s.rule_type === 'main');
-  if (!stage) stage = S.stages[0];
   
-  if (stage) {
-    stage.idx = S.stages.indexOf(stage);
-    stage.qs = (S.points || [])
-      .filter(p => p.stage_id === stage.id)
-      .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
+  // Ищем первый НЕЗАВЕРШЁННЫЙ этап
+  for (let i = 0; i < S.stages.length; i++) {
+    const stage = S.stages[i];
+    const stagePoints = (S.points || []).filter(p => p.stage_id === stage.id);
+    const openedCount = stagePoints.filter(p => S.opened.has(String(p.id))).length;
+    
+    // Если этап не завершён — возвращаем его
+    if (openedCount < stagePoints.length) {
+      stage.idx = i;
+      stage.qs = stagePoints.sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
+      return stage;
+    }
   }
-  return stage;
+  
+  // Все этапы завершены
+  return null;
 }
-/* ==================================================================== */
+
  
 /* ---------- старт ---------- */
 loadProg();initMap();
