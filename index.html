@@ -31,7 +31,13 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 #ovPointEdit .ed::-webkit-scrollbar {  width: 6px}
 #ovPointEdit .ed::-webkit-scrollbar-track {  background: transparent}
 #ovPointEdit .ed::-webkit-scrollbar-thumb {  background: #1d4a63;  border-radius: 3px}
-@media (max-width: 600px) {  #ovPointEdit .ed::-webkit-scrollbar {    width: 0  }
+/* Кнопки-иконки в редакторе этапов — адаптив под мобильный */
+#stagesList button { min-width: 32px; min-height: 32px; touch-action: manipulation}
+#stagesList button:active { background: #1d4a63}
+@media (max-width: 480px) { #stagesList > div > div:first-child { flex-wrap: wrap }
+  #stagesList button { font-size: 16px; padding: 6px 10px} 
+}
+@media (max-width: 600px) { #ovPointEdit .ed::-webkit-scrollbar { width: 0 }
   #ovPointEdit .ed {padding-right: 4px}
 }
 #map{position:absolute;inset:0}
@@ -231,14 +237,18 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
           <option value="sequence">Строгая последовательность (ошибка = рестарт)</option>
         </select>
       </div>
-      <div id="stTimerWrap" hidden><label>Таймер (секунды)</label><input id="stTimer" type="number" value="600"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <input type="checkbox" id="stTimerEnabled" style="width:20px;height:20px">
+        <label for="stTimerEnabled" style="margin:0;cursor:pointer">⏱ Ограничить время этапа</label>
+      </div>
+      <div id="stTimerWrap" hidden style="margin-top:8px"><label>Длительность (секунды)</label><input id="stTimer" type="number" value="600" min="30" step="30"></div>
       
-      <button id="stSave" style="margin-top:10px">💾 Сохранить этап</button>
+      <button id="stSave" style="margin-top:12px">💾 Сохранить этап</button>
       <button id="stDelete" class="sec" hidden>🗑 Удалить этап</button>
       <button id="stCancel" class="sec">Отмена</button>
     </div>
   </div>
-</div> 
+</div>
 
 <!-- Редактор точки (отдельное окно) -->
 <div id="ovPointEdit" class="overlay" hidden>
@@ -590,55 +600,176 @@ function captureFox(q){
 
 function renderStagesEditor() {
   const container = $('stagesList');
+  if (!container) return;
   container.innerHTML = '';
   
+  if (!S.stages || !S.stages.length) {
+    container.innerHTML = '<p style="text-align:center;color:#8ab4d8">Этапы не найдены. Создай первый!</p>';
+    return;
+  }
+
   S.stages.forEach((stage, idx) => {
     const stageEl = document.createElement('div');
-    stageEl.className = 'stage-accordion';
     stageEl.style.cssText = 'border:1px solid #1d4a63;border-radius:8px;margin:8px 0;overflow:hidden';
     
-    // Заголовок этапа (кликабельный)
+    // === ЗАГОЛОВОК ЭТАПА С КНОПКАМИ ===
     const header = document.createElement('div');
-    header.style.cssText = 'background:#102a3c;padding:10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center';
-    header.innerHTML = `
-      <span><b>Э${idx + 1}.</b> ${stage.title} (${stage.rule_type})${stage.settings?.global_timer ? ' ⏱ ' + Math.floor(stage.settings.global_timer / 60) + ' мин' : ''}</span>
-      <span class="toggle">▶</span>
-    `;
+    header.style.cssText = 'background:#102a3c;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap';
     
-    // Список точек этапа (скрыт по умолчанию)
+    const titleSpan = document.createElement('span');
+    const timerInfo = stage.settings?.global_timer ? ` ⏱${Math.floor(stage.settings.global_timer/60)}м` : '';
+    titleSpan.innerHTML = `<b>Э${idx+1}.</b> ${stage.title} (${stage.rule_type})${timerInfo}`;
+    titleSpan.style.cssText = 'flex:1;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    titleSpan.onclick = () => toggleStage(stageEl, pointsList, toggleBtn);
+    
+    const toggleBtn = document.createElement('span');
+    toggleBtn.textContent = '▶';
+    toggleBtn.style.cssText = 'cursor:pointer;font-size:18px;padding:0 4px';
+    toggleBtn.onclick = () => toggleStage(stageEl, pointsList, toggleBtn);
+    
+    // Кнопки управления этапом
+    const btnUp = makeIconBtn('⬆️', 'Поднять этап', () => moveStage(idx, -1));
+    const btnDown = makeIconBtn('⬇️', 'Опустить этап', () => moveStage(idx, 1));
+    const btnEdit = makeIconBtn('✏️', 'Редактировать этап', () => openStageEditor(stage));
+    const btnDel = makeIconBtn('🗑', 'Удалить этап (точки станут безэтапными)', () => deleteStage(stage));
+    
+    header.appendChild(titleSpan);
+    header.appendChild(toggleBtn);
+    header.appendChild(btnUp);
+    header.appendChild(btnDown);
+    header.appendChild(btnEdit);
+    header.appendChild(btnDel);
+    
+    // === СПИСОК ТОЧЕК ===
     const pointsList = document.createElement('div');
     pointsList.style.cssText = 'background:#0d1626;padding:10px;display:none';
     
-    const stagePoints = S.points
+    const stagePoints = (S.points || [])
       .filter(p => p.stage_id === stage.id)
-      .sort((a, b) => a.stage_order - b.stage_order);
+      .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
     
     stagePoints.forEach((p, pIdx) => {
-      const pointEl = document.createElement('div');
-      pointEl.style.cssText = 'padding:8px;border-bottom:1px solid #16324a;cursor:pointer;display:flex;justify-content:space-between';
-      pointEl.innerHTML = `<span>📍 ${pIdx + 1}. ${p.title}</span><span>✏️</span>`;
-      pointEl.onclick = () => openPointEditor(p, stage.id);
-      pointsList.appendChild(pointEl);
+      const pointRow = document.createElement('div');
+      pointRow.style.cssText = 'padding:8px;border-bottom:1px solid #16324a;display:flex;align-items:center;gap:6px';
+      
+      const pointName = document.createElement('span');
+      pointName.textContent = `📍 ${pIdx+1}. ${p.title}`;
+      pointName.style.cssText = 'flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      pointName.onclick = () => openPointEditor(p, stage.id);
+      
+      const ptUp = makeIconBtn('⬆', 'Вверх', () => movePointInStage(p, stage, -1));
+      const ptDown = makeIconBtn('⬇', 'Вниз', () => movePointInStage(p, stage, 1));
+      const ptEdit = makeIconBtn('✏️', 'Редактировать', () => openPointEditor(p, stage.id));
+      
+      pointRow.appendChild(pointName);
+      pointRow.appendChild(ptUp);
+      pointRow.appendChild(ptDown);
+      pointRow.appendChild(ptEdit);
+      pointsList.appendChild(pointRow);
     });
     
-    // Кнопка добавления точки в этот этап
     const addBtn = document.createElement('button');
-    addBtn.textContent = '+ Точка';
+    addBtn.textContent = '+ Точка в этот этап';
     addBtn.style.cssText = 'width:100%;margin-top:8px;background:#102a3c;border:1px dashed #1d4a63;color:#8ab4d8;padding:8px;border-radius:6px;cursor:pointer';
     addBtn.onclick = () => openPointEditor(null, stage.id);
     pointsList.appendChild(addBtn);
-    
-    // Раскрытие/скрытие
-    header.onclick = () => {
-      const isOpen = pointsList.style.display !== 'none';
-      pointsList.style.display = isOpen ? 'none' : 'block';
-      header.querySelector('.toggle').textContent = isOpen ? '▶' : '▼';
-    };
     
     stageEl.appendChild(header);
     stageEl.appendChild(pointsList);
     container.appendChild(stageEl);
   });
+}
+
+// Вспомогательные функции
+
+function toggleStage(stageEl, pointsList, toggleBtn) {
+  const isOpen = pointsList.style.display !== 'none';
+  pointsList.style.display = isOpen ? 'none' : 'block';
+  toggleBtn.textContent = isOpen ? '▶' : '▼';
+}
+
+function makeIconBtn(icon, title, onclick) {
+  const btn = document.createElement('button');
+  btn.textContent = icon;
+  btn.title = title;
+  btn.style.cssText = 'background:transparent;border:1px solid #1d4a63;color:#8ab4d8;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;line-height:1';
+  btn.onclick = (e) => { e.stopPropagation(); onclick(); };
+  return btn;
+}
+
+// Перемещение этапа вверх/вниз
+async function moveStage(idx, direction) {
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= S.stages.length) return;
+  
+  const stageA = S.stages[idx];
+  const stageB = S.stages[newIdx];
+  
+  // Меняем sort_order местами
+  const tempOrder = stageA.sort_order;
+  stageA.sort_order = stageB.sort_order;
+  stageB.sort_order = tempOrder;
+  
+  // Сохраняем оба этапа в БД
+  await rpcSaveStage({ id: stageA.id, scenario_slug: S.scenario.slug, title: stageA.title, rule_type: stageA.rule_type, sort_order: stageA.sort_order, settings: stageA.settings });
+  await rpcSaveStage({ id: stageB.id, scenario_slug: S.scenario.slug, title: stageB.title, rule_type: stageB.rule_type, sort_order: stageB.sort_order, settings: stageB.settings });
+  
+  // Пересортировываем локально
+  S.stages.sort((a, b) => a.sort_order - b.sort_order);
+  renderStagesEditor();
+  renderDebug();
+  toast(direction < 0 ? '⬆️ Этап поднят' : '⬇️ Этап опущен');
+}
+
+// Перемещение точки внутри этапа
+async function movePointInStage(point, stage, direction) {
+  const stagePoints = S.points
+    .filter(p => p.stage_id === stage.id)
+    .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
+  
+  const idx = stagePoints.findIndex(p => p.id === point.id);
+  const newIdx = idx + direction;
+  if (idx === -1 || newIdx < 0 || newIdx >= stagePoints.length) return;
+  
+  const neighbor = stagePoints[newIdx];
+  
+  // Меняем stage_order местами
+  const tempOrder = point.stage_order;
+  point.stage_order = neighbor.stage_order;
+  neighbor.stage_order = tempOrder;
+  
+  // Сохраняем обе точки
+  const pass = sessionStorage.getItem('gq_editor_pass') || '';
+  await rpcSaveQuest(point, pass);
+  await rpcSaveQuest(neighbor, pass);
+  
+  renderStagesEditor();
+  renderDebug();
+  toast(direction < 0 ? '⬆️ Точка поднята' : '⬇️ Точка опущена');
+}
+
+// Удаление этапа (точки становятся безэтапными)
+async function deleteStage(stage) {
+  if (!confirm(`Удалить этап "${stage.title}"?\nТочки станут "безэтапными" и не удалятся.`)) return;
+  
+  try {
+    const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/stages?id=eq.' + stage.id, {
+      method: 'DELETE',
+      headers: { apikey: CONFIG.supabaseAnonKey, Authorization: 'Bearer ' + CONFIG.supabaseAnonKey }
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    
+    // Локально обнуляем stage_id у точек
+    S.points.forEach(p => { if (p.stage_id === stage.id) p.stage_id = null; });
+    S.stages = S.stages.filter(s => s.id !== stage.id);
+    
+    renderStagesEditor();
+    renderDebug();
+    updateGame();
+    toast('🗑 Этап удалён, точки стали безэтапными');
+  } catch (e) {
+    toast('❌ Ошибка удаления: ' + e.message);
+  }
 }
 
 function openPointEditor(point, stageId) {
@@ -684,16 +815,22 @@ function openStageEditor(stage) {
   S.editingStage = stage || null;
   $('stageEditTitle').textContent = stage ? '✏️ Редактировать этап' : '➕ Новый этап';
   $('stTitle').value = stage ? stage.title : '';
-  $('stRuleType').value = stage ? (stage.rule_type || stage.kind || 'linear') : 'linear';
+  $('stRuleType').value = stage ? (stage.rule_type || 'linear') : 'linear';
   
-  // Показываем таймер только для бонуса/последовательности/фонарика
-  const isTimed = ['bonus', 'sequence', 'flashlight'].includes($('stRuleType').value);
-  $('stTimerWrap').hidden = !isTimed;
-  $('stTimer').value = stage && stage.settings?.global_timer ? stage.settings.global_timer : 600;
+  // Чекбокс таймера
+  const hasTimer = stage && stage.settings && stage.settings.global_timer;
+  $('stTimerEnabled').checked = !!hasTimer;
+  $('stTimer').value = hasTimer ? stage.settings.global_timer : 600;
+  $('stTimerWrap').hidden = !hasTimer;
   
   $('stDelete').hidden = !stage;
   $('ovStageEdit').hidden = false;
 }
+
+// Реакция на чекбокс таймера
+$('stTimerEnabled').onchange = () => {
+  $('stTimerWrap').hidden = !$('stTimerEnabled').checked;
+};
 
 // 2. Реакция на смену типа этапа (показать/скрыть таймер)
 $('stRuleType').onchange = () => {
@@ -707,28 +844,33 @@ $('stSave').onclick = async () => {
   if (!title) { toast('⚠️ Введи название этапа'); return; }
   
   const settings = {};
-  if (!$('stTimerWrap').hidden) {
-    settings.global_timer = parseInt($('stTimer').value, 10) || 600;
+  if ($('stTimerEnabled').checked) {
+    const secs = parseInt($('stTimer').value, 10);
+    if (secs < 30) { toast('⚠️ Минимум 30 секунд'); return; }
+    settings.global_timer = secs;
   }
 
-  const id = await rpcSaveStage({
+  const payload = {
     id: S.editingStage ? S.editingStage.id : null,
     scenario_slug: S.scenario.slug,
     title: title,
     rule_type: $('stRuleType').value,
     sort_order: S.editingStage ? S.editingStage.sort_order : S.stages.length,
     settings: settings
-  });
+  };
+
+  const id = await rpcSaveStage(payload);
 
   if (id > 0) {
     toast('✅ Этап сохранён');
     $('ovStageEdit').hidden = true;
     if (!S.editingStage) {
-      S.stages.push({ id, title, rule_type: $('stRuleType').value, sort_order: S.stages.length, settings });
+      S.stages.push({ id, ...payload });
     } else {
-      Object.assign(S.editingStage, { title, rule_type: $('stRuleType').value, settings });
+      Object.assign(S.editingStage, { title: payload.title, rule_type: payload.rule_type, settings: payload.settings });
     }
     renderStagesEditor();
+    updateGame();
   } else {
     toast('❌ Ошибка сохранения этапа');
   }
