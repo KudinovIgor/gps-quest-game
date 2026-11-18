@@ -1219,15 +1219,34 @@ async function ensurePass() {
 // 6. RPC-функции для связи с Supabase (если они были удалены)
 async function rpcSaveQuest(point, pass) {
   try {
-    const payload = { ...point, editor_pass: pass };
+    // Оборачиваем данные в один JSON-объект с ключом p_data
+    const payload = { p_data: { ...point, editor_pass: pass } };
+    
     const r = await fetch(CONFIG.supabaseUrl + '/rest/v1/rpc/save_quest_point', {
       method: 'POST',
-      headers: { apikey: CONFIG.supabaseAnonKey, Authorization: 'Bearer ' + CONFIG.supabaseAnonKey, 'Content-Type': 'application/json' },
+      headers: { 
+        apikey: CONFIG.supabaseAnonKey, 
+        Authorization: 'Bearer ' + CONFIG.supabaseAnonKey, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify(payload)
     });
-    if (!r.ok) return -2;
-    return await r.json();
-  } catch (e) { return -2; }
+    
+    if (!r.ok) {
+      const errText = await r.text();
+      console.error('❌ HTTP ошибка:', r.status, errText);
+      toast('⚠️ Ошибка БД: ' + r.status);
+      return -2;
+    }
+    
+    const result = await r.json();
+    console.log('✅ Точка сохранена, id:', result);
+    return result;
+  } catch (e) { 
+    console.error('❌ Исключение:', e);
+    toast('⚠️ Исключение: ' + e.message);
+    return -2; 
+  }
 }
 
 async function rpcDeleteQuest(id, pass) {
