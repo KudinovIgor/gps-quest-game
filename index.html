@@ -665,8 +665,8 @@ function renderStagesEditor() {
     toggleBtn.textContent = '▶';
     toggleBtn.onclick = () => toggleStage(stageEl, pointsList, toggleBtn);
     
-    const btnUp = makeIconBtn('⬆', 'Поднять этап', () => moveStage(idx, -1));
-    const btnDown = makeIconBtn('⬇', 'Опустить этап', () => moveStage(idx, 1));
+    const btnUp = makeIconBtn('⬆', 'Поднять этап', () => moveStage(stage.id, -1));
+    const btnDown = makeIconBtn('⬇', 'Опустить этап', () => moveStage(stage.id, 1));
     const btnEdit = makeIconBtn('✏', 'Редактировать этап', () => openStageEditor(stage));
     const btnDel = makeIconBtn('🗑', 'Удалить этап', () => deleteStage(stage));
     
@@ -750,25 +750,37 @@ function animateMove(dataAttr, value, direction) {
   setTimeout(() => el.classList.remove('anim-move-up', 'anim-move-down'), 400);
 }
 
-async function moveStage(idx, direction) {
+async function moveStage(stageId, direction) {
+  // Находим актуальный индекс этапа в отсортированном массиве
+  const idx = S.stages.findIndex(s => s.id === stageId);
+  if (idx === -1) return;
+  
   const newIdx = idx + direction;
-  if (newIdx < 0 || newIdx >= S.stages.length) return;
+  if (newIdx < 0 || newIdx >= S.stages.length) {
+    toast(direction < 0 ? '⬆️ Уже наверху' : '⬇️ Уже внизу');
+    return;
+  }
   
   const stageA = S.stages[idx];
   const stageB = S.stages[newIdx];
   
+  // Меняем sort_order местами
   const tempOrder = stageA.sort_order;
   stageA.sort_order = stageB.sort_order;
   stageB.sort_order = tempOrder;
   
+  // Сохраняем оба этапа в БД
   await rpcSaveStage({ id: stageA.id, scenario_slug: S.scenario.slug, title: stageA.title, rule_type: stageA.rule_type, sort_order: stageA.sort_order, settings: stageA.settings });
   await rpcSaveStage({ id: stageB.id, scenario_slug: S.scenario.slug, title: stageB.title, rule_type: stageB.rule_type, sort_order: stageB.sort_order, settings: stageB.settings });
   
+  // Пересортировываем локально
   S.stages.sort((a, b) => a.sort_order - b.sort_order);
   renderStagesEditor();
   renderDebug();
-  // АНИМАЦИЯ перемещённого этапа
+  
+  // Анимация
   animateMove('data-stage-id', stageA.id, direction);
+  
   toast(direction < 0 ? '⬆️ Этап поднят' : '⬇️ Этап опущен');
 }
 
