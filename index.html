@@ -40,6 +40,29 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 @media (max-width: 600px) { #ovPointEdit .ed::-webkit-scrollbar { width: 0 }
   #ovPointEdit .ed {padding-right: 4px}
 }
+/* ===== РЕДАКТОР ЭТАПОВ ===== */
+.stage-block {border: 1px solid #1d4a63;border-radius: 8px;margin: 8px 0;overflow: hidden;background: #0d1626}
+.stage-header {background: #102a3c;padding: 8px 10px;display: flex;align-items: center;gap: 4px;flex-wrap: nowrap}
+.stage-title {flex: 1; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px}
+.stage-type { color: #8ab4d8; font-size: 12px}
+/* Квадратные кнопки-иконки */
+.icon-btn { width: 32px; height: 32px; min-width: 32px; min-height: 32px; max-width: 32px; max-height: 32px; background: transparent; border: 1px solid #1d4a63; color: #8ab4d8; border-radius: 6px;
+  cursor: pointer; font-size: 14px; line-height: 1; padding: 0; display: flex; align-items: center; justify-content: center; touch-action: manipulation; flex-shrink: 0
+}
+.icon-btn:active { background: #1d4a63; color: #fff}
+.icon-btn.toggle-btn { font-size: 12px; margin-right: 4px}
+
+/* Список точек этапа */
+.stage-points { background: #0d1626; padding: 8px; display: none}
+.point-row {padding: 8px;border-bottom: 1px solid #16324a;display: flex;align-items: center;gap: 4px}
+.point-name { flex: 1; cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px}
+.add-point-btn { width: 100%; margin-top: 8px; background: #102a3c; border: 1px dashed #1d4a63; color: #8ab4d8; padding: 10px; border-radius: 6px; cursor: pointer; font-size: 14px}
+.add-point-btn:active { background: #1d4a63}
+
+/* На узких экранах */
+@media (max-width: 480px) { .stage-title { font-size: 13px;}
+  .icon-btn { width: 30px;height: 30px;min-width: 30px;min-height: 30px;max-width: 30px;max-height: 30px;font-size: 13px}
+}
 #map{position:absolute;inset:0}
 .leaflet-control-attribution{font-size:9px;opacity:.6}
 #radarView{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;overflow:auto;background:radial-gradient(circle at 50% 40%,#0a1a2a 0%,#070b12 70%)}
@@ -107,6 +130,19 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .ed .row{display:flex;gap:6px}
 .ed .row>div{flex:1;display:flex;flex-direction:column}
 [hidden]{display:none!important}
+/* Анимация перемещения строк */
+@keyframes slideUp {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-18px); background: rgba(0,229,255,0.15); }
+  100% { transform: translateY(0); }
+}
+@keyframes slideDown {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(18px); background: rgba(0,229,255,0.15); }
+  100% { transform: translateY(0); }
+}
+.anim-move-up   { animation: slideUp 0.35s ease; }
+.anim-move-down { animation: slideDown 0.35s ease; }
 </style>
 </head>
 <body>
@@ -610,28 +646,29 @@ function renderStagesEditor() {
 
   S.stages.forEach((stage, idx) => {
     const stageEl = document.createElement('div');
-    stageEl.style.cssText = 'border:1px solid #1d4a63;border-radius:8px;margin:8px 0;overflow:hidden';
+    stageEl.className = 'stage-block';
+    stageEl.dataset.stageId = stage.id;
+    stageEl.className = 'stage-block';
     
-    // === ЗАГОЛОВОК ЭТАПА С КНОПКАМИ ===
+    // === ЗАГОЛОВОК ЭТАПА ===
     const header = document.createElement('div');
-    header.style.cssText = 'background:#102a3c;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap';
+    header.className = 'stage-header';
     
     const titleSpan = document.createElement('span');
+    titleSpan.className = 'stage-title';
     const timerInfo = stage.settings?.global_timer ? ` ⏱${Math.floor(stage.settings.global_timer/60)}м` : '';
-    titleSpan.innerHTML = `<b>Э${idx+1}.</b> ${stage.title} (${stage.rule_type})${timerInfo}`;
-    titleSpan.style.cssText = 'flex:1;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    titleSpan.innerHTML = `<b>Э${idx+1}.</b> ${stage.title} <span class="stage-type">(${stage.rule_type})</span>${timerInfo}`;
     titleSpan.onclick = () => toggleStage(stageEl, pointsList, toggleBtn);
     
-    const toggleBtn = document.createElement('span');
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'icon-btn toggle-btn';
     toggleBtn.textContent = '▶';
-    toggleBtn.style.cssText = 'cursor:pointer;font-size:18px;padding:0 4px';
     toggleBtn.onclick = () => toggleStage(stageEl, pointsList, toggleBtn);
     
-    // Кнопки управления этапом
-    const btnUp = makeIconBtn('⬆️', 'Поднять этап', () => moveStage(idx, -1));
-    const btnDown = makeIconBtn('⬇️', 'Опустить этап', () => moveStage(idx, 1));
-    const btnEdit = makeIconBtn('✏️', 'Редактировать этап', () => openStageEditor(stage));
-    const btnDel = makeIconBtn('🗑', 'Удалить этап (точки станут безэтапными)', () => deleteStage(stage));
+    const btnUp = makeIconBtn('⬆', 'Поднять этап', () => moveStage(idx, -1));
+    const btnDown = makeIconBtn('⬇', 'Опустить этап', () => moveStage(idx, 1));
+    const btnEdit = makeIconBtn('✏', 'Редактировать этап', () => openStageEditor(stage));
+    const btnDel = makeIconBtn('🗑', 'Удалить этап', () => deleteStage(stage));
     
     header.appendChild(titleSpan);
     header.appendChild(toggleBtn);
@@ -642,7 +679,7 @@ function renderStagesEditor() {
     
     // === СПИСОК ТОЧЕК ===
     const pointsList = document.createElement('div');
-    pointsList.style.cssText = 'background:#0d1626;padding:10px;display:none';
+    pointsList.className = 'stage-points';
     
     const stagePoints = (S.points || [])
       .filter(p => p.stage_id === stage.id)
@@ -650,16 +687,18 @@ function renderStagesEditor() {
     
     stagePoints.forEach((p, pIdx) => {
       const pointRow = document.createElement('div');
-      pointRow.style.cssText = 'padding:8px;border-bottom:1px solid #16324a;display:flex;align-items:center;gap:6px';
+      pointRow.className = 'point-row';
+      pointRow.dataset.pointId = p.id;
+      pointRow.className = 'point-row';
       
       const pointName = document.createElement('span');
+      pointName.className = 'point-name';
       pointName.textContent = `📍 ${pIdx+1}. ${p.title}`;
-      pointName.style.cssText = 'flex:1;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
       pointName.onclick = () => openPointEditor(p, stage.id);
       
       const ptUp = makeIconBtn('⬆', 'Вверх', () => movePointInStage(p, stage, -1));
       const ptDown = makeIconBtn('⬇', 'Вниз', () => movePointInStage(p, stage, 1));
-      const ptEdit = makeIconBtn('✏️', 'Редактировать', () => openPointEditor(p, stage.id));
+      const ptEdit = makeIconBtn('✏', 'Редактировать', () => openPointEditor(p, stage.id));
       
       pointRow.appendChild(pointName);
       pointRow.appendChild(ptUp);
@@ -669,8 +708,8 @@ function renderStagesEditor() {
     });
     
     const addBtn = document.createElement('button');
+    addBtn.className = 'add-point-btn';
     addBtn.textContent = '+ Точка в этот этап';
-    addBtn.style.cssText = 'width:100%;margin-top:8px;background:#102a3c;border:1px dashed #1d4a63;color:#8ab4d8;padding:8px;border-radius:6px;cursor:pointer';
     addBtn.onclick = () => openPointEditor(null, stage.id);
     pointsList.appendChild(addBtn);
     
@@ -680,7 +719,6 @@ function renderStagesEditor() {
   });
 }
 
-// Вспомогательные функции
 
 function toggleStage(stageEl, pointsList, toggleBtn) {
   const isOpen = pointsList.style.display !== 'none';
@@ -690,14 +728,28 @@ function toggleStage(stageEl, pointsList, toggleBtn) {
 
 function makeIconBtn(icon, title, onclick) {
   const btn = document.createElement('button');
+  btn.className = 'icon-btn';
   btn.textContent = icon;
   btn.title = title;
-  btn.style.cssText = 'background:transparent;border:1px solid #1d4a63;color:#8ab4d8;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;line-height:1';
   btn.onclick = (e) => { e.stopPropagation(); onclick(); };
   return btn;
 }
 
-// Перемещение этапа вверх/вниз
+// Универсальная анимация перемещения: ищет блок по data-атрибуту и "дёргает" его
+function animateMove(dataAttr, value, direction) {
+  // direction: -1 = вверх, +1 = вниз
+  const selector = `[${dataAttr}="${value}"]`;
+  const el = document.querySelector(selector);
+  if (!el) return;
+  
+  // Сбрасываем предыдущую анимацию (если быстро кликают)
+  el.classList.remove('anim-move-up', 'anim-move-down');
+  void el.offsetWidth; // force reflow
+  
+  el.classList.add(direction < 0 ? 'anim-move-up' : 'anim-move-down');
+  setTimeout(() => el.classList.remove('anim-move-up', 'anim-move-down'), 400);
+}
+
 async function moveStage(idx, direction) {
   const newIdx = idx + direction;
   if (newIdx < 0 || newIdx >= S.stages.length) return;
@@ -705,23 +757,21 @@ async function moveStage(idx, direction) {
   const stageA = S.stages[idx];
   const stageB = S.stages[newIdx];
   
-  // Меняем sort_order местами
   const tempOrder = stageA.sort_order;
   stageA.sort_order = stageB.sort_order;
   stageB.sort_order = tempOrder;
   
-  // Сохраняем оба этапа в БД
   await rpcSaveStage({ id: stageA.id, scenario_slug: S.scenario.slug, title: stageA.title, rule_type: stageA.rule_type, sort_order: stageA.sort_order, settings: stageA.settings });
   await rpcSaveStage({ id: stageB.id, scenario_slug: S.scenario.slug, title: stageB.title, rule_type: stageB.rule_type, sort_order: stageB.sort_order, settings: stageB.settings });
   
-  // Пересортировываем локально
   S.stages.sort((a, b) => a.sort_order - b.sort_order);
   renderStagesEditor();
   renderDebug();
+  // АНИМАЦИЯ перемещённого этапа
+  animateMove('data-stage-id', stageA.id, direction);
   toast(direction < 0 ? '⬆️ Этап поднят' : '⬇️ Этап опущен');
 }
 
-// Перемещение точки внутри этапа
 async function movePointInStage(point, stage, direction) {
   const stagePoints = S.points
     .filter(p => p.stage_id === stage.id)
@@ -732,23 +782,21 @@ async function movePointInStage(point, stage, direction) {
   if (idx === -1 || newIdx < 0 || newIdx >= stagePoints.length) return;
   
   const neighbor = stagePoints[newIdx];
-  
-  // Меняем stage_order местами
   const tempOrder = point.stage_order;
   point.stage_order = neighbor.stage_order;
   neighbor.stage_order = tempOrder;
   
-  // Сохраняем обе точки
   const pass = sessionStorage.getItem('gq_editor_pass') || '';
   await rpcSaveQuest(point, pass);
   await rpcSaveQuest(neighbor, pass);
   
   renderStagesEditor();
   renderDebug();
+  // АНИМАЦИЯ перемещённой точки
+  animateMove('data-point-id', point.id, direction);  
   toast(direction < 0 ? '⬆️ Точка поднята' : '⬇️ Точка опущена');
 }
 
-// Удаление этапа (точки становятся безэтапными)
 async function deleteStage(stage) {
   if (!confirm(`Удалить этап "${stage.title}"?\nТочки станут "безэтапными" и не удалятся.`)) return;
   
@@ -759,7 +807,6 @@ async function deleteStage(stage) {
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     
-    // Локально обнуляем stage_id у точек
     S.points.forEach(p => { if (p.stage_id === stage.id) p.stage_id = null; });
     S.stages = S.stages.filter(s => s.id !== stage.id);
     
