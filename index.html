@@ -534,14 +534,13 @@ function getStages(){
   return cachedStages;
 }
 function currentStage(){
-  const stages=(S.stages||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-  if(!stages.length) return null;
-  for(let i=0;i<stages.length;i++){
-    const st=stages[i];
-    const qs=(S.points||[]).filter(p=>p.stage_id===st.id)
+  if(!S.stages||!S.stages.length) return null;
+  for(let i=0;i<S.stages.length;i++){
+    const st=S.stages[i];
+    const qs=S.points.filter(p=>p.stage_id===st.id)
       .sort((a,b)=>(a.stage_order||0)-(b.stage_order||0));
     const opened=qs.filter(p=>S.opened.has(String(p.id))).length;
-    if(!qs.length || opened<qs.length){ st.idx=i; st.qs=qs; return st; }
+    if(qs.length&&opened<qs.length){ st.idx=i; st.qs=qs; return st; }
   }
   return null;
 }
@@ -1544,7 +1543,6 @@ function renderCard(){
   const ar=$('ar')||$('arrow'), hl=$('hintLine'), bg=$('btnBonusGo');
   const hide=el=>{if(el)el.hidden=true;};
   const t=target();
-  T.textContent = (S.atPoint ? '🎯 ' : '📍 ') + t.title;
   if(S.story){ T.textContent='📜 Страница истории'; D.textContent='Читай окно истории — после «Далее» маршрут продолжится.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
   if(S.fact){ T.textContent='✅ Загадка решена'; D.textContent='Читай факт о месте — затем следующая точка.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
   if(S.phase==='bonus'){ T.textContent='📡 Бонус-рейд'; D.textContent='Только радар: ищи скрытые точки по силе сигнала.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
