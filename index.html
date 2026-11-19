@@ -120,7 +120,10 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 .box{background:var(--panel);border:1px solid var(--cy);border-radius:16px;padding:20px;max-width:440px;width:100%;text-align:center;box-shadow:0 0 40px rgba(0,229,255,.3)}
 .box h2{color:var(--cy);margin:0 0 10px}
 .box p{font-size:14px;line-height:1.5;color:#9fc6e8}
-.box button{margin-top:12px;width:100%;background:var(--cy);border:0;border-radius:10px;padding:12px;font-size:16px;font-weight:700;cursor:pointer}
+.box button:not(.icon-btn):not(.add-point-btn){
+  margin-top:12px;width:100%;background:var(--cy);border:0;border-radius:10px;
+  padding:12px;font-size:16px;font-weight:700;cursor:pointer
+}
 .box button.sec{background:transparent;border:1px solid #1d4a63;color:var(--txt);margin-top:8px}
 .key{font-size:22px;letter-spacing:2px;color:var(--gr);border:1px dashed var(--gr);border-radius:10px;padding:10px;margin:10px 0;word-break:break-all}
 #toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:3000;background:#0d1626;border:1px solid var(--gr);color:var(--txt);padding:8px 16px;border-radius:20px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .3s;max-width:90vw;text-align:center}
