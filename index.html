@@ -1577,19 +1577,39 @@ function renderCard(){
   if(S.fact){ T.textContent='✅ Загадка решена'; D.textContent='Читай факт о месте — затем следующая точка.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
   if(S.phase==='bonus'){ T.textContent='📡 Бонус-рейд'; D.textContent='Только радар: ищи скрытые точки по силе сигнала.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
 
-  if(!t){
-    const st=currentStage();
-    if(!S.stages||!S.stages.length){
-      T.textContent='⚙️ Этапы не настроены';
-      D.textContent='Включи 🐞 Отладку и нажми 📋 Этапы, чтобы создать этапы и распределить точки.';
-    }else if(st&&(st.rule_type==='foxhunter')){
-      T.textContent='🦊 Идёт лисий этап'; D.textContent='Поймай всех лис в режиме 🦊 — маршрут продолжится сам.';
-    }else if(st&&(st.rule_type==='bonus')){
-      T.textContent='📡 Бонус-рейд доступен'; D.textContent='Начни рейд, когда будешь готов.';
-    }else{
-      T.textContent='🏁 Этап завершён'; D.textContent='Следующий этап начнётся автоматически.';
-    }
-    if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return;
+  // есть цель — показываем карточку точки
+  const st=currentStage();
+  const isStory=st&&(st.rule_type==='story'||st.kind==='story');
+  const inQuiz = !!(S.foxQuiz||S.bonusQuiz);
+
+  if(!S.atPoint && !inQuiz){
+    // === СОСТОЯНИЕ 1: ИДЁМ К ТОЧКЕ ===
+    T.textContent='📍 '+t.title;
+    D.textContent=isStory?'Подойди к кругу — откроется страница истории.'
+                          :'Подойди к точке — там тебя ждёт загадка.';
+    hide(ar);hide(hl);hide(bg);
+    if(Dist&&S.pos){ Dist.textContent='≈ '+Math.round(dbgDist(S.pos[0],S.pos[1],t.lat,t.lng))+' м · направляйся к точке'; }
+    else if(Dist){ Dist.textContent=''; }
+    $('answerRow').hidden=true;
+    $('answerInput').value='';
+    return;
+  }
+
+  // === СОСТОЯНИЕ 2: МЫ У ТОЧКИ (или открыта загадка лисы/бонуса) ===
+  T.textContent=(isStory?'📜 ':'🎯 ')+t.title;
+  D.textContent=t.desc||t.description||'Загадка ждёт ответа.';
+  if(ar)ar.hidden=false;
+  if(hl)hl.hidden=true;
+  hide(bg);
+  if(Dist&&S.pos){ Dist.textContent='📍 ты у точки'; }
+  else if(Dist){ Dist.textContent=''; }
+
+  if(!isStory){
+    $('answerRow').hidden=false;
+    $('answerInput').disabled=false;
+    $('answerBtn').disabled=false;
+    $('answerInput').placeholder='Ответ...';
+    if(!inQuiz) setTimeout(()=>$('answerInput').focus(),120);
   }
 
   // есть цель — показываем карточку точки, стрелку и расстояние не прячем
