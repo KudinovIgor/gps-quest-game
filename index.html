@@ -1104,16 +1104,6 @@ function renderDebug(fit){
   if(fit&&chain.length) map.fitBounds(L.latLngBounds(chain),{padding:[50,50]});
 }
 
-  
-  // 2. Точки без этапа ИЛИ с битым stage_id — рисуем серым
-  const orphanPoints = S.points.filter(p => !p.stage_id || !S.stages.some(st => st.id === p.stage_id));
-  orphanPoints.forEach((q, i) => mk(q, '?' + (i + 1), 'orphan', '#665'));
-  
-  // 3. Фит карты
-  const all = S.points.map(q => [q.lat, q.lng]);
-  if (fit && all.length) map.fitBounds(L.latLngBounds(all), { padding: [50, 50] });
-}
-
 // Вспомогательная функция (должна быть СРАЗУ ПОСЛЕ renderDebug)
 function mk(q,label,cls,color){
   const m=L.marker([q.lat,q.lng],{
