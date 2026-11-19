@@ -712,6 +712,15 @@ function renderStagesEditor() {
   });
 }
 
+function makeIconBtn(icon, title, onclick) {
+  const btn = document.createElement('button');
+  btn.className = 'icon-btn';
+  btn.textContent = icon;
+  btn.title = title;
+  btn.onclick = (e) => { e.stopPropagation(); onclick(); };
+  return btn;
+}
+
 
 function toggleStage(stageEl, pointsList, toggleBtn) {
   // Проверяем, открыт ли сейчас список
