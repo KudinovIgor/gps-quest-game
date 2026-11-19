@@ -389,7 +389,10 @@ const normAns=s=>(s||'').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').t
 const getPointsByType = (type) => S.points.filter(q => 
   q.kind === type || (q.stage_id && S.stages?.find(s => s.id === q.stage_id)?.rule_type === type)
 );
-const mains = () => getPointsByType('main') || getPointsByType('linear');
+const mains = () => {
+  const m = getPointsByType('main');
+  return m.length ? m : getPointsByType('linear');
+};
 const bonuses = () => getPointsByType('bonus');
 const foxes = () => getPointsByType('foxhunter');
 const stories = () => getPointsByType('story');
@@ -442,16 +445,14 @@ function refreshMarkers(){
   });
   if(openedQs.length>1)L.polyline(openedQs.map(q=>[q.lat,q.lng]),{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
   /* --- стрелка направления на следующую цель --- */
-  let at=null;
-  const cst=currentStage();
-  if(cst&&cst.kind==='main')at=target();
-  else if(S.phase==='bonus'){
+  let at=target();
+  if(!at && S.phase==='bonus'){
     let bd=Infinity;
     for(const q of bonuses().filter(q=>!S.opened.has(String(q.id)))){
       const d=S.pos?distM(S.pos[0],S.pos[1],q.lat,q.lng):Infinity;
       if(d<bd){bd=d;at=q;}
     }
-  }                                                // в лисьем этапе стрелки нет: охота на слух
+  }                                              // в лисьем этапе стрелки нет: охота на слух
   if(at&&S.pos){
     dirMark.setLatLng(S.pos);
     const b=bearing(S.pos[0],S.pos[1],at.lat,at.lng);
@@ -1435,6 +1436,11 @@ function foxTick(){
 
 /* ---------- игровая логика ---------- */
 function updateGame(){
+   /* === РАСЧЁТ "Я У ЦЕЛИ" (нужен для submitAnswer и подсветки круга) === */
+  const _tgt = target();
+  S.atPoint = !!(_tgt && S.pos &&
+                distM(S.pos[0], S.pos[1], _tgt.lat, _tgt.lng)
+                  <= (_tgt.radius || CONFIG.arriveRadius));
   const ms=mains(),bs=bonuses();
   const om=ms.filter(q=>S.opened.has(String(q.id))).length;
   const cst=currentStage();
@@ -1538,7 +1544,7 @@ function renderCard(){
   const ar=$('ar')||$('arrow'), hl=$('hintLine'), bg=$('btnBonusGo');
   const hide=el=>{if(el)el.hidden=true;};
   const t=target();
-
+  T.textContent = (S.atPoint ? '🎯 ' : '📍 ') + t.title;
   if(S.story){ T.textContent='📜 Страница истории'; D.textContent='Читай окно истории — после «Далее» маршрут продолжится.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
   if(S.fact){ T.textContent='✅ Загадка решена'; D.textContent='Читай факт о месте — затем следующая точка.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
   if(S.phase==='bonus'){ T.textContent='📡 Бонус-рейд'; D.textContent='Только радар: ищи скрытые точки по силе сигнала.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
@@ -1566,6 +1572,11 @@ function renderCard(){
   if(ar)ar.hidden=false;
   if(hl)hl.hidden=true;
   hide(bg);
+  const inQuiz = !!(S.foxQuiz||S.bonusQuiz);
+  const canAns  = S.atPoint || inQuiz;
+  $('answerInput').disabled = !canAns;
+  $('answerBtn').disabled   = !canAns;
+  $('answerInput').placeholder = canAns ? 'Ответ...' : 'Подойди к точке...';
   if(Dist&&S.pos){ Dist.textContent='≈ '+Math.round(dbgDist(S.pos[0],S.pos[1],t.lat,t.lng))+' м'; }
   else if(Dist){ Dist.textContent=''; }
 }
