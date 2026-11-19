@@ -1,9 +1,11 @@
+```html
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>GPS Квест: Рязань</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23071019'/%3E%3Cpath d='M32 8 L44 44 L32 36 L20 44 Z' fill='%2300e5ff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -11,41 +13,36 @@
   --bg:#071019; --surface:#0d1626; --surface2:#102a3c; --line:#1d4a63;
   --cyan:#00e5ff; --amber:#ffc857; --violet:#c77dff; --blue:#6c9bd2;
   --ok:#3ddc84; --warn:#ffc857; --bad:#ff5470; --info:#8ab4f8;
-  --txt:#eaf6ff; --mut:#8ab4d8; --scrim:rgba(4,10,18,.82);
+  --txt:#eaf6ff; --mut:#8ab4d8; --scrim:rgba(4,10,18,.84);
 }
-*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
-  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden}
-#map{position:fixed;inset:0;background:#0a1420; z-index:1}
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#map{position:fixed;inset:0;background:#0a1420;z-index:1}
 .leaflet-container{font:inherit}
-/* ---------- scrollbars in artifact language ---------- */
-*{scrollbar-width:thin; scrollbar-color:var(--line) transparent}
+*{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 *::-webkit-scrollbar{width:8px;height:8px}
 *::-webkit-scrollbar-track{background:transparent}
 *::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
 *::-webkit-scrollbar-thumb:hover{background:var(--cyan)}
-/* ---------- top bar ---------- */
-#top{position:fixed;top:0;left:0;right:0;z-index:600;display:flex;align-items:center;gap:8px;
-  padding:calc(6px + env(safe-area-inset-top)) 10px 6px;
-  background:linear-gradient(180deg,rgba(7,16,25,.96),rgba(7,16,25,.72) 80%,transparent);
-  backdrop-filter:blur(6px)}
+#top{position:fixed;top:0;left:0;right:0;z-index:600;display:flex;align-items:center;gap:6px;
+  padding:calc(6px + env(safe-area-inset-top)) 8px 6px;
+  background:linear-gradient(180deg,rgba(7,16,25,.97),rgba(7,16,25,.74) 80%,transparent);
+  backdrop-filter:blur(6px);flex-wrap:wrap}
 #top .logo{font-weight:800;letter-spacing:.4px;color:var(--cyan);text-shadow:0 0 14px rgba(0,229,255,.5);white-space:nowrap}
 #progress{font-variant-numeric:tabular-nums;color:var(--amber);font-weight:700;white-space:nowrap}
 #top .sp{flex:1}
 .tbtn{background:var(--surface2);border:1px solid var(--line);color:var(--mut);border-radius:9px;
   padding:6px 9px;font-size:13px;cursor:pointer;transition:.15s;white-space:nowrap}
 .tbtn:hover{color:var(--txt);border-color:var(--cyan)}
-.tbtn.on{background:var(--cyan);color:#04121c;border-color:var(--cyan);font-weight:700;
-  box-shadow:0 0 14px rgba(0,229,255,.45)}
+.tbtn.on{background:var(--cyan);color:#04121c;border-color:var(--cyan);font-weight:700;box-shadow:0 0 14px rgba(0,229,255,.45)}
 .tbtn[hidden]{display:none}
-#geoStatus{position:fixed;top:calc(44px + env(safe-area-inset-top));left:10px;z-index:590;
-  font-size:12px;color:var(--mut);background:rgba(13,22,38,.8);border:1px solid var(--line);
-  border-radius:8px;padding:3px 8px;max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* ---------- mode panels ---------- */
-.panel{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top));
-  z-index:500;width:min(430px,92vw);background:linear-gradient(160deg,var(--surface),#0a1a2c);
-  border:1px solid var(--line);border-radius:14px;padding:12px 14px;
-  box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 22px rgba(0,229,255,.12)}
+#geoStatus{position:fixed;top:calc(46px + env(safe-area-inset-top));left:10px;z-index:590;font-size:12px;color:var(--mut);
+  background:rgba(13,22,38,.85);border:1px solid var(--line);border-radius:8px;padding:3px 8px;max-width:72vw;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel{position:fixed;left:50%;transform:translateX(-50%);top:calc(74px + env(safe-area-inset-top));z-index:500;
+  width:min(430px,92vw);background:linear-gradient(160deg,var(--surface),#0a1a2c);border:1px solid var(--line);
+  border-radius:14px;padding:12px 14px;box-shadow:0 8px 30px rgba(0,0,0,.5),0 0 22px rgba(0,229,255,.12)}
 .panel[hidden]{display:none}
 .panel h3{margin:0 0 6px;font-size:14px;color:var(--violet);letter-spacing:.5px}
 #radarPanel h3{color:var(--blue)}
@@ -53,87 +50,72 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
 .sigbar{flex:1;height:10px;border-radius:5px;background:#0a1420;border:1px solid var(--line);overflow:hidden}
 .sigbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--cyan),var(--ok));transition:width .25s}
 .sigpct{font-weight:800;font-variant-numeric:tabular-nums;color:var(--cyan);min-width:52px;text-align:right}
-.sweep{position:relative;height:64px;margin:8px 0;border-radius:10px;overflow:hidden;
+.sweep{position:relative;height:60px;margin:8px 0;border-radius:10px;overflow:hidden;
   background:radial-gradient(circle at 50% 100%,rgba(0,229,255,.16),transparent 70%),#0a1420;border:1px solid var(--line)}
 .sweep::after{content:"";position:absolute;left:50%;bottom:0;width:2px;height:100%;
-  background:linear-gradient(0deg,var(--cyan),transparent);transform-origin:bottom center;
-  animation:sweep 2.4s linear infinite}
+  background:linear-gradient(0deg,var(--cyan),transparent);transform-origin:bottom center;animation:sweep 2.4s linear infinite}
 @keyframes sweep{from{transform:rotate(-70deg)}to{transform:rotate(70deg)}}
 .panel p{margin:6px 0 0;font-size:12.5px;color:var(--mut)}
-select,input,textarea{background:#071019;border:1px solid var(--line);color:var(--txt);
-  border-radius:8px;padding:8px;font:inherit;width:100%}
+select,input,textarea{background:#071019;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:8px;font:inherit;width:100%}
 select:focus,input:focus,textarea:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,229,255,.2)}
 label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
-/* ---------- quest card ---------- */
-#card{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));
-  z-index:550;width:min(560px,94vw);background:linear-gradient(165deg,#0e1c30,#0a1626);
-  border:1px solid var(--cyan);border-radius:16px;padding:14px 16px;
-  box-shadow:0 -6px 34px rgba(0,0,0,.55),0 0 26px rgba(0,229,255,.22);
-  animation:cardIn .3s ease}
+#card{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));z-index:550;
+  width:min(560px,94vw);background:linear-gradient(165deg,#0e1c30,#0a1626);border:1px solid var(--cyan);border-radius:16px;
+  padding:14px 16px;box-shadow:0 -6px 34px rgba(0,0,0,.55),0 0 26px rgba(0,229,255,.22);animation:cardIn .3s ease}
 @keyframes cardIn{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
 #card.shake{animation:shake .4s}
 @keyframes shake{0%,100%{transform:translate(-50%,0)}20%{transform:translate(calc(-50% - 8px),0)}40%{transform:translate(calc(-50% + 8px),0)}60%{transform:translate(calc(-50% - 5px),0)}80%{transform:translate(calc(-50% + 5px),0)}}
 #cardTitle{margin:0 0 4px;font-size:17px;color:var(--cyan)}
 #cardDist{color:var(--ok);font-weight:700;font-size:13px;margin:0 0 4px;font-variant-numeric:tabular-nums}
-#cardDesc{margin:0;color:var(--txt);font-size:14px;max-height:34vh;overflow:auto}
+#cardDesc{margin:0;color:var(--txt);font-size:14px;max-height:32vh;overflow:auto}
 #hintLine{margin:8px 0 0;color:var(--amber);font-size:13px}
 #answerRow{display:flex;gap:8px;margin-top:10px}
 #answerRow[hidden]{display:none}
 #answerInput{flex:1}
-.btn{background:var(--cyan);color:#04121c;border:0;border-radius:9px;padding:10px 14px;
-  font:inherit;font-weight:700;cursor:pointer;transition:.15s}
+.btn{background:var(--cyan);color:#04121c;border:0;border-radius:9px;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer;transition:.15s}
 .btn:hover{filter:brightness(1.1);box-shadow:0 0 16px rgba(0,229,255,.5)}
 .btn.sec{background:transparent;color:var(--mut);border:1px solid var(--line);font-weight:500}
 .btn.sec:hover{color:var(--txt);border-color:var(--cyan);box-shadow:none}
 .btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+.btn[hidden]{display:none}
 #bonusTimer{font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums}
-/* ---------- test pad ---------- */
 #testPad{position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:560;
   display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);gap:4px}
 #testPad[hidden]{display:none}
-#testPad button{background:var(--surface2);border:1px solid var(--line);color:var(--cyan);
-  border-radius:9px;font-size:16px;cursor:pointer}
+#testPad button{background:var(--surface2);border:1px solid var(--line);color:var(--cyan);border-radius:9px;font-size:16px;cursor:pointer}
 #testPad button:active{background:var(--cyan);color:#04121c}
-/* ---------- overlays ---------- */
-.overlay{position:fixed;inset:0;z-index:900;background:var(--scrim);backdrop-filter:blur(5px);
-  display:flex;align-items:center;justify-content:center;padding:16px}
+.overlay{position:fixed;inset:0;z-index:900;background:var(--scrim);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:16px}
 .overlay[hidden]{display:none}
-.box{background:linear-gradient(170deg,var(--surface),#0a1a2c);border:1px solid var(--cyan);
-  border-radius:16px;box-shadow:0 0 40px rgba(0,229,255,.25);width:min(560px,94vw);
-  max-height:calc(100vh - 32px);padding:18px;display:flex;flex-direction:column;animation:cardIn .25s ease}
+.box{background:linear-gradient(170deg,var(--surface),#0a1a2c);border:1px solid var(--cyan);border-radius:16px;
+  box-shadow:0 0 40px rgba(0,229,255,.25);width:min(560px,94vw);max-height:calc(100vh - 32px);padding:18px;
+  display:flex;flex-direction:column;animation:cardIn .25s ease}
 .box h2{margin:0 0 10px;color:var(--cyan);font-size:19px;text-align:center}
 .box .ed{overflow-y:auto;padding-right:6px;flex:1}
 .box p{color:var(--mut);font-size:14px}
 .box .btn{width:100%;margin-top:8px}
 .row2{display:flex;gap:8px}.row2>div{flex:1}
-/* ---------- stages / points editor ---------- */
 .stage-block{border:1px solid var(--line);border-radius:10px;margin:8px 0;overflow:hidden;background:var(--surface)}
 .stage-header{background:var(--surface2);padding:8px 10px;display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
 .stage-title{flex:1;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .stage-type{color:var(--mut);font-size:12px}
-.icon-btn{width:32px;height:32px;min-width:32px;background:transparent;border:1px solid var(--line);
-  color:var(--mut);border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;
-  justify-content:center;padding:0;flex-shrink:0;transition:.15s}
+.icon-btn{width:32px;height:32px;min-width:32px;background:transparent;border:1px solid var(--line);color:var(--mut);
+  border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:.15s}
 .icon-btn:hover{color:var(--txt);border-color:var(--cyan)}
 .icon-btn:active{background:var(--cyan);color:#04121c}
 .stage-points{background:var(--surface);padding:8px;display:none}
 .point-row{padding:7px 6px;border-bottom:1px solid #16324a;display:flex;align-items:center;gap:4px}
 .point-name{flex:1;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
-.add-point-btn{width:100%;margin-top:8px;background:var(--surface2);border:1px dashed var(--line);
-  color:var(--mut);padding:9px;border-radius:8px;cursor:pointer}
+.add-point-btn{width:100%;margin-top:8px;background:var(--surface2);border:1px dashed var(--line);color:var(--mut);padding:9px;border-radius:8px;cursor:pointer}
 .add-point-btn:hover{color:var(--cyan);border-color:var(--cyan)}
 @keyframes slideUp{0%{transform:translateY(0)}40%{transform:translateY(-16px);background:rgba(0,229,255,.14)}100%{transform:translateY(0)}}
 @keyframes slideDown{0%{transform:translateY(0)}40%{transform:translateY(16px);background:rgba(0,229,255,.14)}100%{transform:translateY(0)}}
 .anim-up{animation:slideUp .35s ease}.anim-down{animation:slideDown .35s ease}
-/* ---------- map markers ---------- */
-.dbg{width:24px;height:24px;border-radius:50%;background:#0d1626;border:2px solid var(--cyan);
-  color:var(--txt);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 8px rgba(0,0,0,.6)}
+.dbg{width:24px;height:24px;border-radius:50%;background:#0d1626;border:2px solid var(--cyan);color:var(--txt);
+  font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px rgba(0,0,0,.6)}
 .dbg.orphan{background:#333;color:#ccc}
 .dbg.del{border-color:var(--bad);color:var(--bad)}
 .dbg.stage{width:30px;height:30px;font-size:12px;border:0}
-.playerDot{width:18px;height:18px;border-radius:50%;background:var(--cyan);border:3px solid #fff;
-  box-shadow:0 0 16px var(--cyan)}
+.playerDot{width:18px;height:18px;border-radius:50%;background:var(--cyan);border:3px solid #fff;box-shadow:0 0 16px var(--cyan)}
 .arrowWrap{width:46px;height:46px;position:relative;pointer-events:none}
 .arrowWrap svg{position:absolute;inset:0;transition:transform .3s ease;filter:drop-shadow(0 0 6px rgba(0,229,255,.8))}
 .targetPin{width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
@@ -141,16 +123,16 @@ label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
 .targetPin.story{background:linear-gradient(135deg,var(--info),var(--violet))}
 .pulse{animation:pulse 1.2s ease infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(61,220,132,.6)}50%{box-shadow:0 0 0 14px rgba(61,220,132,0)}}
-/* ---------- toast ---------- */
-#toast{position:fixed;top:calc(50px + env(safe-area-inset-top));left:50%;transform:translate(-50%,-16px);
-  z-index:1200;background:var(--surface);border:1px solid var(--ok);color:var(--txt);
-  border-radius:12px;padding:9px 16px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;
-  max-width:92vw;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+#toast{position:fixed;top:calc(52px + env(safe-area-inset-top));left:50%;transform:translate(-50%,-16px);z-index:1200;
+  background:var(--surface);border:1px solid var(--ok);color:var(--txt);border-radius:12px;padding:9px 16px;font-size:14px;
+  opacity:0;pointer-events:none;transition:.25s;max-width:92vw;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5)}
 #toast.show{opacity:1;transform:translate(-50%,0)}
-#toast.warn{border-color:var(--warn)} #toast.bad{border-color:var(--bad)}
+#toast.warn{border-color:var(--warn)}#toast.bad{border-color:var(--bad)}
+#cfgStatus{font-size:13px;color:var(--mut);white-space:pre-wrap}
+#cfgStatus.ok{color:var(--ok)}#cfgStatus.bad{color:var(--bad)}
 @media (max-width:520px){
-  #top .logo{font-size:13px} .tbtn{padding:5px 7px;font-size:12px}
-  #cardDesc{max-height:26vh} .icon-btn{width:30px;height:30px;min-width:30px}
+  #top .logo{font-size:13px}.tbtn{padding:5px 7px;font-size:12px}
+  #cardDesc{max-height:24vh}.icon-btn{width:30px;height:30px;min-width:30px}
 }
 </style>
 </head>
@@ -180,7 +162,7 @@ label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
   <h3>📡 РАДАР · бонус-рейд <span id="bonusTimer">10:00</span></h3>
   <div class="sigrow"><div class="sigbar"><i id="radarBar"></i></div><span class="sigpct" id="radarPct">--%</span></div>
   <div class="sweep"></div>
-  <p>Скрытые точки видно только здесь. Иди туда, где сигнал растёт; у точки откроется загадка — собери фрагменты ключа.</p>
+  <p>Скрытые точки видно только здесь. Иди туда, где сигнал растёт; у точки откроется загадка — соберёшь фрагменты ключа.</p>
 </div>
 
 <div class="panel" id="foxPanel" hidden>
@@ -208,9 +190,10 @@ label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
     <button class="btn" id="btnAnswer">Ответить</button>
     <button class="btn sec" id="btnHint" title="Подсказка">💡</button>
   </div>
+  <button class="btn" id="btnBonusGo" hidden style="margin-top:10px;width:100%">⏱ Начать бонус-рейд</button>
 </div>
 
-<div class="overlay" id="ovStart"><div class="box">
+<div class="overlay" id="ovStart" hidden><div class="box">
   <h2>🧭 GPS Квест: Рязань</h2>
   <div class="ed">
     <p>Квест-бродилка с загадками. Открывается кодовым словом. У точки подойди к кругу — откроется загадка или страница истории; верный ответ даст факт о месте и следующую точку. Этапы бывают линейные, «лисы» (поиск по сигналу) и бонус-рейд на время.</p>
@@ -219,19 +202,23 @@ label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
     <input id="codeInput" placeholder="например demo" autocomplete="off">
   </div>
   <button class="btn" id="btnStart">🔑 Ввести и начать</button>
+  <button class="btn sec" id="btnDemo">🧪 Играть демо без базы</button>
   <button class="btn sec" id="btnCfg2">⚙ Подключение к базе</button>
 </div></div>
 
 <div class="overlay" id="ovCfg" hidden><div class="box">
   <h2>⚙ Подключение к базе</h2>
   <div class="ed">
-    <p>Один раз за устройство. Значения хранятся локально в браузере. Anon key возьми из своего старого index.html (CONFIG.supabaseAnonKey).</p>
-    <label>Supabase URL</label><input id="cfgUrl">
+    <p>Один раз за устройство, хранится локально в браузере. Проще всего: открой свой старый рабочий index.html, скопируй строку <b>const CONFIG={...}</b> и вставь сюда целиком — адрес и ключ извлекутся сами.</p>
+    <label>Вставь CONFIG или весь старый файл</label>
+    <textarea id="cfgPaste" rows="4" placeholder="const CONFIG={supabaseUrl:'https://xxxx.supabase.co', supabaseAnonKey:'eyJ...'}"></textarea>
+    <button class="btn sec" id="btnCfgExtract" style="width:100%;margin-top:6px">📥 Извлечь адрес и ключ</button>
+    <label>Supabase URL</label><input id="cfgUrl" placeholder="https://ваш-проект.supabase.co">
     <label>Anon key</label><input id="cfgKey" placeholder="eyJhbGciOi...">
     <p id="cfgStatus"></p>
   </div>
   <button class="btn" id="btnCfgTest">🔌 Проверить связь</button>
-  <button class="btn" id="btnCfgSave">💾 Сохранить</button>
+  <button class="btn" id="btnCfgSave">💾 Сохранить подключение</button>
   <button class="btn sec" id="btnCfgClose">Закрыть</button>
 </div></div>
 
@@ -327,20 +314,26 @@ label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}
 
 <script>
 'use strict';
-/* ================= CONFIG / STATE ================= */
+const CONFIG = {
+  supabaseUrl: 'https://uitjtiujqfypylnjcqsr.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8',
+  arriveRadius: 40,
+  bonusSeconds: 600,
+  foxRange: 600,          // дальность «приёма» маяка в режиме охоты, м
+  cityCenter: [54.6269, 39.7408]
+};
 const CFG_KEY='gq_cfg';
-const CFG=Object.assign({url:'https://uitjtiujnfqvplnjcqsr.supabase.co',key:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpdGp0aXVqcWZ5cHlsbmpjcXNyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5OTQzOTAsImV4cCI6MjEwODU3MDM5MH0.1jRd_cafA4b8zXNbVYhlXLMCZauXdQQd0C7olu_NgG8'},
-  JSON.parse(localStorage.getItem(CFG_KEY)||'{}'));
+const CFG=Object.assign({url:'',key:''},JSON.parse(localStorage.getItem(CFG_KEY)||'{}'));
 const $=id=>document.getElementById(id);
 const S={scenario:null,points:[],stages:[],opened:new Set(),phase:'main',mode:'map',
   debug:false,delMode:false,test:false,pos:null,acc:0,arrived:false,arrivalPoint:null,
   wrong:{},bonusEndsAt:0,timerId:0,foxId:null,muted:false,editingPoint:null,editingStage:null,
-  fragments:[]};
+  fragments:[],pendingCollect:null,deferPresent:false};
 const PAL={linear:'#ffc857',main:'#ffc857',bonus:'#6c9bd2',foxhunter:'#c77dff',story:'#8ab4f8',flashlight:'#00e5ff',sequence:'#ff5470'};
 let toastT=0;
-function toast(msg,ms=3200,kind=''){const t=$('toast');t.textContent=msg;t.className='show '+kind;
+function toast(msg,ms=3400,kind=''){const t=$('toast');t.textContent=msg;t.className='show '+kind;
   clearTimeout(toastT);toastT=setTimeout(()=>t.className='',ms);}
-/* ================= AUDIO ================= */
+/* ---------- audio ---------- */
 let AC=null;
 function ac(){if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC;}
 function beep(f=880,d=.09,g=.06){if(S.muted)return;try{const a=ac(),o=a.createOscillator(),v=a.createGain();
@@ -348,19 +341,31 @@ function beep(f=880,d=.09,g=.06){if(S.muted)return;try{const a=ac(),o=a.createOs
   o.start();v.gain.exponentialRampToValueAtTime(.0001,a.currentTime+d);o.stop(a.currentTime+d);}catch(e){}}
 function chime(){[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.14,.07),i*90));}
 function ping(){beep(1320,.12,.05);setTimeout(()=>beep(1760,.1,.04),110);}
-/* ================= GEO / MATH ================= */
+/* ---------- math ---------- */
 function distM(a,b,c,d){const R=6371000,t=x=>x*Math.PI/180,dLa=t(c-a),dLo=t(d-b);
   const h=Math.sin(dLa/2)**2+Math.cos(t(a))*Math.cos(t(c))*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
 function bearing(a,b,c,d){const t=x=>x*Math.PI/180,y=Math.sin(t(d-b))*Math.cos(t(c));
   const x=Math.cos(t(a))*Math.sin(t(c))-Math.sin(t(a))*Math.cos(t(c))*Math.cos(t(d-b));
   return (Math.atan2(y,x)*180/Math.PI+360)%360;}
-/* ================= DB ================= */
+/* ---------- db ---------- */
+function dbReady(){return !!(CFG.url&&CFG.key);}
+function netHint(e){
+  const m=String(e&&e.message||e);
+  if(/Failed to fetch|NetworkError|ERR_NAME_NOT_RESOLVED|ENOTFOUND/i.test(m))
+    return 'Адрес базы не резолвится. Проверь URL проекта в ⚙ (опечатка в ref) или проект удалён/уснул — зайди в dashboard Supabase и восстанови его.';
+  return m;
+}
 async function rpc(name,body){
-  if(!CFG.key)throw new Error('нет ключа БД — открой ⚙');
-  const r=await fetch(CFG.url+'/rest/v1/rpc/'+name,{method:'POST',
+  if(!dbReady())throw new Error('база не подключена — открой ⚙ и вставь CONFIG из старого файла');
+  let r;
+  try{r=await fetch(CFG.url.replace(/\/+$/,'')+'/rest/v1/rpc/'+name,{method:'POST',
     headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key,'Content-Type':'application/json'},
-    body:JSON.stringify(body)});
-  if(!r.ok)throw new Error('БД '+r.status+': '+(await r.text()).slice(0,140));
+    body:JSON.stringify(body)});}
+  catch(e){throw new Error(netHint(e));}
+  if(!r.ok){const t=await r.text();
+    if(r.status===401||r.status===403)throw new Error('ключ не принят (401/403) — проверь anon key в ⚙');
+    if(r.status===404)throw new Error('функция '+name+' не найдена в БД (404)');
+    throw new Error('БД '+r.status+': '+t.slice(0,140));}
   return r.json();
 }
 function normPoint(r){return{id:r.id,scenario_slug:r.scenario_slug,title:r.title||'',
@@ -369,25 +374,25 @@ function normPoint(r){return{id:r.id,scenario_slug:r.scenario_slug,title:r.title
 async function loadByCode(code){
   code=(code||'').trim();
   if(!code){toast('⚠️ Введи кодовое слово',3000,'warn');return;}
-  if(code.toLowerCase()==='demo'){applyScenario({slug:'demo',title:'Демо (без БД)'},DEMO.points,DEMO.stages);
-    toast('🧪 Демо-маршрут загружен');return;}
+  if(code.toLowerCase()==='demo'){startDemo();return;}
+  if(!dbReady()){$('ovStart').hidden=true;openCfg('Сначала подключи базу: вставь CONFIG из старого рабочего файла.');return;}
   try{
     const d=await rpc('load_scenario',{p_code:code});
     if(!d||!d.slug){toast('🔑 Код не найден',3200,'warn');return;}
     applyScenario({slug:d.slug,title:d.title,code},(d.points||[]).map(normPoint),d.stages||[]);
     toast('🔑 Сценарий «'+d.title+'» загружен!');
-  }catch(e){toast('⚠️ '+e.message,5000,'bad');}
+  }catch(e){toast('⚠️ '+e.message,6000,'bad');openCfg(e.message);}
 }
 function applyScenario(meta,points,stages){
   S.scenario=meta;S.points=points;S.stages=(stages||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-  S.phase='main';S.arrived=false;S.arrivalPoint=null;S.wrong={};S.fragments=[];S.foxId=null;
+  S.phase='main';S.arrived=false;S.arrivalPoint=null;S.wrong={};S.fragments=[];S.foxId=null;S.deferPresent=false;
   clearInterval(S.timerId);
   try{S.opened=new Set(JSON.parse(localStorage.getItem('gq_prog_'+meta.slug)||'[]'));}catch(e){S.opened=new Set();}
   ['ovBonus','ovFail','ovWin','ovFoxDone','ovFact','ovStory','ovStart'].forEach(id=>$(id).hidden=true);
   setMode('map');refresh();presentStage();renderDebug(true);
 }
 function saveProg(){if(S.scenario)localStorage.setItem('gq_prog_'+S.scenario.slug,JSON.stringify([...S.opened]));}
-/* ================= STAGE FLOW ================= */
+/* ---------- stage flow ---------- */
 function stagePoints(st){return S.points.filter(p=>p.stage_id===st.id).sort((a,b)=>a.stage_order-b.stage_order);}
 function currentStage(){
   for(let i=0;i<S.stages.length;i++){const st=S.stages[i],qs=stagePoints(st);
@@ -402,6 +407,18 @@ function target(){
   if(t==='foxhunter'||t==='bonus')return null;
   return st.qs.find(q=>!S.opened.has(String(q.id)))||null;
 }
+function bonusStage(){return S.stages.find(s=>s.rule_type==='bonus')||null;}
+function nearestUnopened(st){
+  if(!st||!S.pos)return null;
+  const qs=stagePoints(st).filter(q=>!S.opened.has(String(q.id)));
+  if(!qs.length)return null;
+  return qs.reduce((b,q)=>distM(S.pos[0],S.pos[1],q.lat,q.lng)<distM(S.pos[0],S.pos[1],b.lat,b.lng)?q:b,qs[0]);
+}
+function objective(){
+  if(S.phase==='bonus')return nearestUnopened(bonusStage());
+  if(S.mode==='fox'&&S.foxId)return S.points.find(q=>String(q.id)===String(S.foxId))||null;
+  return target();
+}
 function presentStage(){
   const st=currentStage();
   if(!st){if(S.phase!=='won'){S.phase='won';$('winKey').textContent=S.fragments.join('')||'ГОТОВО';$('ovWin').hidden=false;chime();}return;}
@@ -411,38 +428,33 @@ function presentStage(){
   refresh();
 }
 function collect(p){
+  const before=currentStage();
   S.opened.add(String(p.id));saveProg();
-  const st=currentStage();
-  if(st&&(st.rule_type==='bonus')&&p.title)S.fragments.push(p.title.slice(0,2).toUpperCase());
+  const own=S.stages.find(s=>s.id===p.stage_id);
+  if(own&&own.rule_type==='bonus'&&p.title)S.fragments.push(p.title.slice(0,2).toUpperCase());
   S.arrived=false;S.arrivalPoint=null;
+  if(S.mode==='fox')fillFoxSelect();
   refresh();
-  const doneSt=currentStage();
-  if(!doneSt||doneSt.idx!==(st?st.idx:-1))presentStage();
+  const after=currentStage();
+  const changed=!after||!before||after.idx!==before.idx;
+  if(changed&&before&&before.rule_type==='foxhunter'){$('ovFoxDone').hidden=false;S.deferPresent=true;chime();return;}
+  if(changed)presentStage();
 }
-/* ================= ARRIVAL / ANSWER ================= */
+/* ---------- arrival / answer ---------- */
 function checkArrival(){
   if(!S.pos)return;
-  let p=null;
-  if(S.phase==='bonus'){p=nearestUnopened(S.stages.find(s=>s.rule_type==='bonus'));}
-  else if(S.mode==='fox'&&S.foxId){p=S.points.find(q=>String(q.id)===String(S.foxId));}
-  else p=target();
+  const p=objective();
   if(!p||S.opened.has(String(p.id)))return;
   const d=distM(S.pos[0],S.pos[1],p.lat,p.lng);
   if(d<=p.radius&&!S.arrived){
     S.arrived=true;S.arrivalPoint=p;ping();
     const st=S.stages.find(s=>s.id===p.stage_id);
-    if(st&&st.rule_type==='story'){openStory(p);}
+    if(st&&st.rule_type==='story')openStory(p);
     else{refresh();$('answerInput').value='';setTimeout(()=>$('answerInput').focus(),120);}
   }
   if(S.arrived&&S.arrivalPoint&&distM(S.pos[0],S.pos[1],S.arrivalPoint.lat,S.arrivalPoint.lng)>S.arrivalPoint.radius*1.6){
     S.arrived=false;S.arrivalPoint=null;refresh();
   }
-}
-function nearestUnopened(st){
-  if(!st||!S.pos)return null;
-  const qs=stagePoints(st).filter(q=>!S.opened.has(String(q.id)));
-  if(!qs.length)return null;
-  return qs.reduce((best,q)=>distM(S.pos[0],S.pos[1],q.lat,q.lng)<distM(S.pos[0],S.pos[1],best.lat,best.lng)?q:best,qs[0]);
 }
 function normAns(s){return (s||'').toLowerCase().replace(/ё/g,'е').replace(/[^a-zа-я0-9 ]/gi,'').replace(/\s+/g,' ').trim();}
 function submitAnswer(){
@@ -464,12 +476,11 @@ function submitAnswer(){
 function openStory(p){$('storyTitle').textContent='📜 '+p.title;
   $('storyText').textContent=(p.desc||'')+(p.comment?'\n\n'+p.comment:'');
   $('ovStory').hidden=false;S.pendingCollect=p;}
-/* ================= RENDER ================= */
+/* ---------- map / render ---------- */
 let map,playerMk,accCircle,arrowMk,targetLayer,debugLayer,guideLine;
 function initMap(){
   map=L.map('map',{zoomControl:true}).setView([54.6292,39.7450],14);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,
-    attribution:'© OpenStreetMap'}).addTo(map);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
   targetLayer=L.layerGroup().addTo(map);debugLayer=L.layerGroup().addTo(map);
   map.on('click',e=>{if(S.test)setPos(e.latlng.lat,e.latlng.lng,8);});
 }
@@ -485,7 +496,7 @@ function drawPlayer(){
   playerMk.setLatLng(S.pos);accCircle.setLatLng(S.pos).setRadius(Math.max(8,Math.min(S.acc||12,60)));
 }
 function drawArrow(){
-  const t=(S.phase==='bonus')?nearestUnopened(S.stages.find(s=>s.rule_type==='bonus')):target();
+  const t=target();
   const show=S.pos&&t&&S.mode==='map'&&!S.arrived;
   if(!show){if(arrowMk){map.removeLayer(arrowMk);arrowMk=null;}if(guideLine){map.removeLayer(guideLine);guideLine=null;}return;}
   const br=bearing(S.pos[0],S.pos[1],t.lat,t.lng);
@@ -497,18 +508,16 @@ function drawArrow(){
 }
 function drawTarget(){
   targetLayer.clearLayers();
-  const t=(S.phase==='bonus')?null:target();
+  const t=target();
   if(!t||S.mode!=='map')return;
   const st=S.stages.find(s=>s.id===t.stage_id);
   const story=st&&st.rule_type==='story';
-  L.circle([t.lat,t.lng],{radius:t.radius,color:story?'#8ab4f8':'#ffc857',weight:2,opacity:.8,
-    dashArray:'6 6',fillColor:story?'#8ab4f8':'#ffc857',fillOpacity:.10,interactive:false}).addTo(targetLayer);
+  L.circle([t.lat,t.lng],{radius:t.radius,color:story?'#8ab4f8':'#ffc857',weight:2,opacity:.8,dashArray:'6 6',
+    fillColor:story?'#8ab4f8':'#ffc857',fillOpacity:.10,interactive:false}).addTo(targetLayer);
   L.marker([t.lat,t.lng],{icon:L.divIcon({className:'',html:'<div class="targetPin'+(story?' story':'')+(S.arrived?' pulse':'')+'"></div>',iconSize:[30,30],iconAnchor:[15,28]}),zIndexOffset:800})
     .bindTooltip(t.title,{direction:'top',offset:[0,-24]}).addTo(targetLayer);
 }
-function refresh(){
-  drawTarget();drawArrow();renderCard();renderHUD();renderPanels();
-}
+function refresh(){drawTarget();drawArrow();renderCard();renderHUD();renderPanels();}
 function renderHUD(){
   const total=S.points.filter(p=>p.stage_id).length||S.points.length;
   const done=S.points.filter(p=>S.opened.has(String(p.id))).length;
@@ -516,8 +525,19 @@ function renderHUD(){
   $('progress').textContent='🚩 '+done+'/'+total+(st?' · Э'+(st.idx+1):'');
 }
 function renderCard(){
-  const T=$('cardTitle'),D=$('cardDesc'),Dist=$('cardDist'),AR=$('answerRow'),HL=$('hintLine');
-  AR.hidden=true;HL.hidden=true;
+  const T=$('cardTitle'),D=$('cardDesc'),Dist=$('cardDist'),AR=$('answerRow'),HL=$('hintLine'),BG=$('btnBonusGo');
+  AR.hidden=true;HL.hidden=true;BG.hidden=true;
+  if(S.arrived&&S.arrivalPoint&&!S.opened.has(String(S.arrivalPoint.id))){
+    const p=S.arrivalPoint;
+    const st=S.stages.find(s=>s.id===p.stage_id);
+    const story=st&&st.rule_type==='story';
+    T.textContent=(story?'📜 ':'❓ ')+p.title;
+    D.textContent=p.desc||'Загадка ждёт ответа.';
+    Dist.textContent='📍 ты у точки';
+    if(!story){AR.hidden=false;
+      if(S.wrong[p.id]>=2&&p.hint){HL.textContent='💡 '+p.hint;HL.hidden=false;}}
+    return;
+  }
   if(S.phase==='won'){T.textContent='🏁 Квест завершён';D.textContent='Спасибо за игру! Ключ у хранителя.';Dist.textContent='';return;}
   if(S.phase==='bonus'){T.textContent='📡 Бонус-рейд';D.textContent='Только радар: ищи скрытые точки по силе сигнала.';Dist.textContent='';return;}
   const t=target();
@@ -525,41 +545,28 @@ function renderCard(){
     const st=currentStage();
     if(!S.stages.length){T.textContent='⚙️ Этапы не настроены';D.textContent='Включи 🐞 Отладку и нажми 📋 Этапы.';}
     else if(st&&st.rule_type==='foxhunter'){T.textContent='🦊 Идёт лисий этап';D.textContent='Поймай всех лис в режиме 🦊 — маршрут продолжится сам.';}
+    else if(st&&st.rule_type==='bonus'){T.textContent='📡 Бонус-рейд доступен';D.textContent='Начни рейд, когда будешь готова: только радар и таймер.';BG.hidden=false;BG.textContent='⏱ Начать рейд ('+fmt(bonusSeconds())+')';}
     else{T.textContent='🏁 Этап завершён';D.textContent='Следующий этап начнётся автоматически.';}
     Dist.textContent='';return;
   }
   const st=S.stages.find(s=>s.id===t.stage_id);
   const story=st&&st.rule_type==='story';
-  if(S.arrived&&S.arrivalPoint&&S.arrivalPoint.id===t.id){
-    T.textContent=(story?'📜 ':'❓ ')+t.title;
-    D.textContent=t.desc||'Загадка ждёт ответа.';
-    Dist.textContent='📍 ты у точки';
-    if(!story){AR.hidden=false;
-      if(S.wrong[t.id]>=2&&t.hint){HL.textContent='💡 '+t.hint;HL.hidden=false;}}
-  }else{
-    T.textContent=(story?'📜 ':'📍 ')+t.title;
-    D.textContent=story?'Подойди к кругу — откроется страница истории.':'Подойди к кругу — там тебя ждёт загадка.';
-    Dist.textContent=S.pos?'≈ '+Math.round(distM(S.pos[0],S.pos[1],t.lat,t.lng))+' м':'🛰 ждём GPS...';
-  }
+  T.textContent=(story?'📜 ':' ')+t.title;
+  D.textContent=story?'Подойди к кругу — откроется страница истории.':'Подойди к кругу — там тебя ждёт загадка.';
+  Dist.textContent=S.pos?'≈ '+Math.round(distM(S.pos[0],S.pos[1],t.lat,t.lng))+' м':'🛰 ждём GPS...';
 }
+function signalTo(p,range){return p&&S.pos?Math.max(0,Math.min(100,Math.round(100*(1-distM(S.pos[0],S.pos[1],p.lat,p.lng)/range)))):0;}
 function renderPanels(){
   $('radarPanel').hidden=!(S.phase==='bonus');
   $('foxPanel').hidden=!(S.mode==='fox');
-  if(S.phase==='bonus'&&S.pos){
-    const p=nearestUnopened(S.stages.find(s=>s.rule_type==='bonus'));
-    const sig=p?Math.max(0,Math.min(100,Math.round(100*(1-distM(S.pos[0],S.pos[1],p.lat,p.lng)/300)))):0;
-    $('radarBar').style.width=sig+'%';$('radarPct').textContent=sig+'%';
-    if(sig>0&&sig%23===0)beep(400+sig*8,.05,.03);
-  }
+  if(S.phase==='bonus'){const sig=signalTo(nearestUnopened(bonusStage()),300);
+    $('radarBar').style.width=sig+'%';$('radarPct').textContent=sig+'%';}
   if(S.mode==='fox'){
     const st=currentStage();
     const foxes=st&&st.rule_type==='foxhunter'?stagePoints(st):[];
     $('foxCount').textContent=foxes.filter(q=>S.opened.has(String(q.id))).length+'/'+foxes.length;
-    const p=S.points.find(q=>String(q.id)===String(S.foxId));
-    const sig=p&&S.pos?Math.max(0,Math.min(100,Math.round(100*(1-distM(S.pos[0],S.pos[1],p.lat,p.lng)/250)))):0;
-    $('foxBar').style.width=sig+'%';$('foxPct').textContent=sig+'%';
-    if(sig>0&&sig%19===0)beep(500+sig*10,.06,.04);
-  }
+    const sig=signalTo(S.points.find(q=>String(q.id)===String(S.foxId)),250);
+    $('foxBar').style.width=sig+'%';$('foxPct').textContent=sig+'%';}
 }
 function fillFoxSelect(){
   const st=currentStage();const sel=$('foxSelect');sel.innerHTML='';
@@ -567,7 +574,7 @@ function fillFoxSelect(){
   foxes.forEach((q,i)=>{const o=document.createElement('option');o.value=q.id;o.textContent='🦊 Лиса '+(i+1)+' · '+q.title;sel.appendChild(o);});
   S.foxId=foxes.length?String(foxes[0].id):null;sel.value=S.foxId||'';
 }
-/* ================= MODES / BONUS ================= */
+/* ---------- modes / bonus ---------- */
 function setMode(m){
   S.mode=m;
   $('btnMap').classList.toggle('on',m==='map');
@@ -576,8 +583,7 @@ function setMode(m){
   if(m==='fox')fillFoxSelect();
   refresh();
 }
-function bonusSeconds(){const st=S.stages.find(s=>s.rule_type==='bonus');
-  return (st&&st.settings&&+st.settings.global_timer)||600;}
+function bonusSeconds(){const st=bonusStage();return (st&&st.settings&&+st.settings.global_timer)||600;}
 function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function updateBonusUI(){
   const sec=bonusSeconds();
@@ -596,9 +602,9 @@ function startBonus(){
 function tick(){
   const left=Math.max(0,Math.round((S.bonusEndsAt-Date.now())/1000));
   $('bonusTimer').textContent=fmt(left);
-  if(left<=0){clearInterval(S.timerId);S.phase='main';$('ovFail').hidden=false;beep(140,.5,.09);}
+  if(left<=0){clearInterval(S.timerId);S.phase='main';S.arrived=false;S.arrivalPoint=null;$('ovFail').hidden=false;beep(140,.5,.09);refresh();}
 }
-/* ================= DEBUG / EDITOR ================= */
+/* ---------- debug / editor ---------- */
 async function ensurePass(){
   const c=sessionStorage.getItem('gq_editor_pass');if(c)return c;
   return new Promise(res=>{
@@ -653,17 +659,17 @@ function mkDbg(q,label,cls,color){
     if(S.scenario.slug==='demo'){toast('🧪 перенесено (демо)');return;}
     const pass=await ensurePass();if(!pass)return;
     try{const ok=await rpc('move_quest',{p_id:Number(q.id),p_lat:q.lat,p_lng:q.lng,p_pass:pass});
-      if(ok===true)toast('💾 Точка '+label+' сохранена');else{sessionStorage.removeItem('gq_editor_pass');toast('🔑 пароль не принят',3200,'bad');}}
-    catch(e){toast('⚠️ '+e.message,4000,'bad');}});
+      if(ok===true)toast('💾 Точка '+label+' сохранена');
+      else{sessionStorage.removeItem('gq_editor_pass');toast('🔑 пароль не принят',3200,'bad');}}
+    catch(e){toast('⚠️ '+e.message,4500,'bad');}});
   m.on('click',()=>{if(S.delMode)delPoint(q);else openPointEditor(q,q.stage_id);});
 }
 async function delPoint(q){
   if(!confirm('Удалить точку «'+q.title+'»?'))return;
   if(S.scenario.slug!=='demo'){const pass=await ensurePass();if(!pass)return;
-    try{await rpc('editor_delete_quest',{p_id:Number(q.id),p_pass:pass});}catch(e){toast('⚠️ '+e.message,4000,'bad');return;}}
+    try{await rpc('editor_delete_quest',{p_id:Number(q.id),p_pass:pass});}catch(e){toast('⚠️ '+e.message,4500,'bad');return;}}
   S.points=S.points.filter(p=>p.id!==q.id);renderDebug();refresh();toast('🗑 Точка удалена');
 }
-/* ---- stages editor ---- */
 function renderStagesEditor(){
   const box=$('stagesList');box.innerHTML='';
   if(!S.stages.length){box.innerHTML='<p style="text-align:center;color:var(--mut)">Этапов нет. Создай первый!</p>';return;}
@@ -709,7 +715,7 @@ async function moveStage(id,dir){
     if(S.scenario.slug!=='demo'){await rpc('save_stage',{p_data:a});await rpc('save_stage',{p_data:b});}
     S.stages.sort((x,y)=>x.sort_order-y.sort_order);
     renderStagesEditor();renderDebug();refresh();animateMove('data-stage-id',id,dir);
-  }catch(e){toast('⚠️ '+e.message,4000,'bad');}finally{setTimeout(()=>moving=false,350);}
+  }catch(e){toast('⚠️ '+e.message,4500,'bad');}finally{setTimeout(()=>moving=false,350);}
 }
 async function movePoint(p,st,dir){
   const qs=stagePoints(st);const i=qs.findIndex(q=>q.id===p.id),j=i+dir;
@@ -717,15 +723,15 @@ async function movePoint(p,st,dir){
   const n=qs[j];[p.stage_order,n.stage_order]=[n.stage_order,p.stage_order];
   if(S.scenario.slug!=='demo'){const pass=await ensurePass();if(!pass)return;
     try{await rpc('save_quest_point',{p_data:{...p,editor_pass:pass}});await rpc('save_quest_point',{p_data:{...n,editor_pass:pass}});}
-    catch(e){toast('⚠️ '+e.message,4000,'bad');return;}}
+    catch(e){toast('⚠️ '+e.message,4500,'bad');return;}}
   renderStagesEditor();renderDebug();refresh();animateMove('data-point-id',p.id,dir);
 }
 async function deleteStage(st){
   if(!confirm('Удалить этап «'+st.title+'»? Точки останутся без этапа.'))return;
   if(S.scenario.slug!=='demo'){
-    try{const r=await fetch(CFG.url+'/rest/v1/stages?id=eq.'+st.id,{method:'DELETE',
+    try{const r=await fetch(CFG.url.replace(/\/+$/,'')+'/rest/v1/stages?id=eq.'+st.id,{method:'DELETE',
       headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key}});
-      if(!r.ok)throw new Error('БД '+r.status);}catch(e){toast('⚠️ '+e.message,4000,'bad');return;}}
+      if(!r.ok)throw new Error('БД '+r.status);}catch(e){toast('⚠️ '+netHint(e),4500,'bad');return;}}
   S.points.forEach(p=>{if(p.stage_id===st.id)p.stage_id=null;});
   S.stages=S.stages.filter(s=>s.id!==st.id);
   renderStagesEditor();renderDebug();refresh();toast('🗑 Этап удалён, точки без этапа');
@@ -748,12 +754,11 @@ async function saveStage(){
     rule_type:$('stRuleType').value,sort_order:S.editingStage?S.editingStage.sort_order:S.stages.length,settings};
   if(S.scenario.slug!=='demo'){
     try{const id=await rpc('save_stage',{p_data:data});if(!(id>0))throw new Error('БД вернула '+id);data.id=id;}
-    catch(e){toast('⚠️ '+e.message,4500,'bad');return;}}
+    catch(e){toast('⚠️ '+e.message,5000,'bad');return;}}
   else data.id=Date.now();
   if(S.editingStage)Object.assign(S.editingStage,data);else S.stages.push(data);
   $('ovStageEdit').hidden=true;renderStagesEditor();renderDebug();refresh();toast('✅ Этап сохранён');
 }
-/* ---- point editor ---- */
 function openPointEditor(p,stageId){
   S.editingPoint=p||null;
   const sel=$('edStageId');sel.innerHTML='<option value="">-- Без этапа --</option>';
@@ -778,12 +783,40 @@ async function savePoint(){
     const pass=await ensurePass();if(!pass)return;
     try{const id=await rpc('save_quest_point',{p_data:{...p,editor_pass:pass}});
       if(!(id>0))throw new Error('БД вернула '+id);p.id=id;}
-    catch(e){toast('⚠️ '+e.message,4500,'bad');return;}}
+    catch(e){toast('⚠️ '+e.message,5000,'bad');return;}}
   else if(!p.id)p.id='d'+Date.now();
   if(!S.points.some(q=>q.id===p.id))S.points.push(p);
   $('ovPointEdit').hidden=true;renderDebug();renderStagesEditor();refresh();toast('💾 Точка сохранена');
 }
-/* ================= DEMO SEED ================= */
+/* ---------- config ---------- */
+function openCfg(msg){
+  $('cfgUrl').value=CFG.url;$('cfgKey').value=CFG.key;
+  const st=$('cfgStatus');st.className='';st.textContent=msg||'';
+  $('ovCfg').hidden=false;
+}
+function extractCfg(){
+  const txt=$('cfgPaste').value;
+  const u=txt.match(/supabaseUrl\s*[:=]\s*['"`]([^'"`]+)['"`]/i)||txt.match(/https:\/\/[a-z0-9-]+\.supabase\.co/i);
+  const k=txt.match(/supabaseAnonKey\s*[:=]\s*['"`]([^'"`]+)['"`]/i)||txt.match(/eyJ[A-Za-z0-9_\-\.]{20,}/);
+  if(u)$('cfgUrl').value=(u[1]||u[0]).trim();
+  if(k)$('cfgKey').value=(k[1]||k[0]).trim();
+  const st=$('cfgStatus');
+  if(u&&k){st.className='ok';st.textContent='✅ Извлечено: '+$('cfgUrl').value+'\nНажми «Проверить связь».';}
+  else{st.className='bad';st.textContent='❌ Не нашёл '+(u?'':'URL ')+(k?'':'anon key')+'. Вставь строку CONFIG целиком или заполни поля вручную.';}
+}
+async function testCfg(){
+  const url=$('cfgUrl').value.trim().replace(/\/+$/,''),key=$('cfgKey').value.trim();
+  const st=$('cfgStatus');st.className='';st.textContent='⏳ проверяю...';
+  if(!url||!key){st.className='bad';st.textContent='❌ Заполни URL и ключ (или вставь CONFIG выше).';return;}
+  try{
+    const r=await fetch(url+'/rest/v1/scenarios?select=slug&limit=1',{headers:{apikey:key,Authorization:'Bearer '+key}});
+    if(r.ok){st.className='ok';st.textContent='✅ Связь есть, таблица scenarios читается. Сохраняй подключение.';}
+    else if(r.status===401||r.status===403){st.className='bad';st.textContent='❌ Ключ не принят ('+r.status+'). Проверь anon key.';}
+    else if(r.status===404){st.className='bad';st.textContent='❌ 404: нет таблицы scenarios или неверный URL проекта.';}
+    else{st.className='bad';st.textContent='❌ БД ответила '+r.status+': '+(await r.text()).slice(0,120);}
+  }catch(e){st.className='bad';st.textContent='❌ '+netHint(e);}
+}
+/* ---------- demo seed ---------- */
 const DEMO={stages:[
   {id:1,scenario_slug:'demo',title:'Начало',rule_type:'story',sort_order:0,settings:{}},
   {id:2,scenario_slug:'demo',title:'Основной этап',rule_type:'linear',sort_order:1,settings:{}},
@@ -791,29 +824,36 @@ const DEMO={stages:[
   {id:4,scenario_slug:'demo',title:'Бонус-рейд',rule_type:'bonus',sort_order:3,settings:{global_timer:300}}],
  points:[
   {id:'d1',scenario_slug:'demo',title:'Приветствие',lat:54.6292,lng:39.7450,desc:'Добро пожаловать в Рязань! Это страница истории: квест ведёт тебя по местам с загадками. Нажми «Далее» — и в путь.',answer:'',hint:'',comment:'Рязань стоит на Трубеже и Лыбеди. Пошли!',radius:40,stage_id:1,stage_order:0},
-  {id:'d2',scenario_slug:'demo',title:'Гранит науки',lat:54.62878,lng:39.753132,desc:'Перед главным корпусом университета лежит камень. Сколько букв в слове, высеченном на нём (одно слово, кириллица)?',answer:'кот|кот учёный',hint:'Мурлычет и учится.',comment:'Кот учёный ходит по цепи кругом — привет Пушкину и рязанским котам.',radius:40,stage_id:2,stage_order:0},
+  {id:'d2',scenario_slug:'demo',title:'Гранит науки',lat:54.62878,lng:39.753132,desc:'Перед главным корпусом университета лежит камень с учёным котом. Сколько букв в слове «кот» (цифрой)?',answer:'3|три',hint:'Мурлыкает и учится.',comment:'Кот учёный ходит по цепи кругом — привет Пушкину и рязанским котам.',radius:40,stage_id:2,stage_order:0},
   {id:'d3',scenario_slug:'demo',title:'Памятник Братству',lat:54.6305,lng:39.7480,desc:'Сколько фигур в композиции памятника (цифрой)?',answer:'3|три',hint:'Больше двух, меньше четырёх.',comment:'Три фигуры — три поколения рязанцев.',radius:40,stage_id:2,stage_order:1},
   {id:'d4',scenario_slug:'demo',title:'Беседка',lat:54.6320,lng:39.7510,desc:'Сколько столбиков держит крышу беседки (цифрой)?',answer:'12|двенадцать',hint:'Столько же месяцев в году.',comment:'Двенадцать столбиков — как месяцев в году.',radius:40,stage_id:2,stage_order:2},
   {id:'d5',scenario_slug:'demo',title:'Лиса в домике',lat:54.6335,lng:39.7440,desc:'А эта лиса — в домике! Сколько серых железных прутьев в ограде домика (цифрой)?',answer:'12',hint:'Количество серых железных прутьев.',comment:'Лисы умеют прятаться даже в городе.',radius:35,stage_id:3,stage_order:0},
   {id:'d6',scenario_slug:'demo',title:'Лиса на камне',lat:54.6350,lng:39.7490,desc:'Сколько ступеней ведёт к камню, где прячется лиса (цифрой)?',answer:'4|четыре',hint:'Четыре времени года.',comment:'Маяк найден по звуку — охота состоялась.',radius:35,stage_id:3,stage_order:1},
-  {id:'d7',scenario_slug:'demo',title:'КЛ',lat:54.6310,lng:39.7560,desc:'Фрагмент ключа: первая буква названия реки, на которой стоит Рязань (Трубеж)? Нет — назови реку, впадающую в Оку у кремля: первые две буквы заглавными.',answer:'ТР|тр',hint:'Тру...',comment:'Фрагмент «КЛ» твой.',radius:45,stage_id:4,stage_order:0},
+  {id:'d7',scenario_slug:'demo',title:'КЛ',lat:54.6310,lng:39.7560,desc:'Фрагмент ключа: назови первые две буквы реки, впадающей в Оку у рязанского кремля (заглавными).',answer:'ТР|тр',hint:'Тру...',comment:'Фрагмент «КЛ» твой.',radius:45,stage_id:4,stage_order:0},
   {id:'d8',scenario_slug:'demo',title:'ЮЧ',lat:54.6270,lng:39.7520,desc:'Фрагмент ключа: сколько букв в слове «ключ» (цифрой)?',answer:'4|четыре',hint:'К-Л-Ю-Ч.',comment:'Фрагмент «ЮЧ» твой. Ключ собран!',radius:45,stage_id:4,stage_order:1}]};
-/* ================= WIRING ================= */
+function startDemo(){
+  applyScenario({slug:'demo',title:'Демо (без БД)'},DEMO.points.map(p=>({...p})),DEMO.stages.map(s=>({...s})));
+  if(!S.pos){S.test=true;$('btnTest').classList.add('on');$('testPad').hidden=false;
+    setPos(54.6270,39.7410,8);}
+  toast('🧪 Демо-маршрут активен. ◎ — телепорт к цели. Свою базу подключи в ⚙.',5200);
+}
+/* ---------- wiring ---------- */
 function init(){
   initMap();
   $('btnStart').onclick=()=>loadByCode($('codeInput').value);
   $('codeInput').onkeydown=e=>{if(e.key==='Enter')loadByCode($('codeInput').value);};
+  $('btnDemo').onclick=()=>{$('ovStart').hidden=true;startDemo();};
   $('btnCode').onclick=()=>{$('ovStart').hidden=false;setTimeout(()=>$('codeInput').focus(),80);};
   $('btnMap').onclick=()=>setMode('map');
-  $('btnRadar').onclick=()=>setMode('radar');
+  $('btnRadar').onclick=()=>{if(S.phase!=='bonus'&&currentStage()&&currentStage().rule_type==='bonus'){updateBonusUI();$('ovBonus').hidden=false;}setMode('radar');};
   $('btnFox').onclick=()=>setMode('fox');
   $('btnTest').onclick=()=>{S.test=!S.test;$('btnTest').classList.toggle('on',S.test);
     $('testPad').hidden=!S.test;
     if(S.test&&!S.pos)setPos(54.6292,39.7450,8);
     toast(S.test?'🧪 Тест: стрелки ходят, ◎ — телепорт к цели':'🧪 Тест выкл');};
   $('testPad').querySelectorAll('button').forEach(b=>b.onclick=()=>{
-    const d=b.dataset.d;const t=target()||nearestUnopened(S.stages.find(s=>s.rule_type==='bonus'));
-    if(d==='c'){if(t)setPos(t.lat,t.lng,5);else toast('нет цели',1800,'warn');return;}
+    const d=b.dataset.d;
+    if(d==='c'){const t=objective();if(t)setPos(t.lat,t.lng,5);else toast('нет цели',1800,'warn');return;}
     if(!S.pos)return;const step=0.00018;
     const dx=d==='n'?step:d==='s'?-step:0,dy=d==='e'?step:d==='w'?-step:0;
     setPos(S.pos[0]+dx,S.pos[1]+dy,8);});
@@ -825,7 +865,8 @@ function init(){
   $('btnDel').onclick=()=>{S.delMode=!S.delMode;$('btnDel').classList.toggle('on',S.delMode);
     renderDebug();toast(S.delMode?'➖ режим удаления: кликни точку':'➖ выкл');};
   $('btnReset').onclick=()=>{if(!confirm('Сбросить прогресс этого квеста?'))return;
-    S.opened.clear();saveProg();S.phase='main';S.fragments=[];S.arrived=false;clearInterval(S.timerId);
+    S.opened.clear();saveProg();S.phase='main';S.fragments=[];S.arrived=false;S.arrivalPoint=null;S.deferPresent=false;
+    clearInterval(S.timerId);['ovBonus','ovFail','ovWin','ovFoxDone','ovFact','ovStory'].forEach(id=>$(id).hidden=true);
     refresh();presentStage();toast('⟲ Прогресс сброшен');};
   $('btnMute').onclick=()=>{S.muted=!S.muted;$('btnMute').textContent=S.muted?'🔇':'🔊';
     $('btnMute').classList.toggle('on',S.muted);if(!S.muted)beep(880,.08);};
@@ -835,11 +876,12 @@ function init(){
   $('btnFactNext').onclick=()=>{$('ovFact').hidden=true;const p=S.pendingCollect;S.pendingCollect=null;if(p)collect(p);};
   $('btnStoryNext').onclick=()=>{$('ovStory').hidden=true;const p=S.pendingCollect;S.pendingCollect=null;if(p)collect(p);};
   $('btnBonusStart').onclick=startBonus;
+  $('btnBonusGo').onclick=startBonus;
   $('btnRetry').onclick=startBonus;
-  $('btnBonusLater').onclick=()=>{$('ovBonus').hidden=true;toast('рейд ждёт — начни из 📡 Радар',2600);};
+  $('btnBonusLater').onclick=()=>{$('ovBonus').hidden=true;refresh();toast('рейд ждёт — начни из карточки или 📡 Радар',2800);};
   $('btnWinOk').onclick=()=>$('ovWin').hidden=true;
-  $('btnFoxDone').onclick=()=>{$('ovFoxDone').hidden=true;setMode('map');presentStage();};
-  $('foxSelect').onchange=e=>{S.foxId=e.target.value;S.arrived=false;refresh();};
+  $('btnFoxDone').onclick=()=>{$('ovFoxDone').hidden=true;S.deferPresent=false;setMode('map');presentStage();};
+  $('foxSelect').onchange=e=>{S.foxId=e.target.value;S.arrived=false;S.arrivalPoint=null;refresh();};
   $('stTimerEnabled').onchange=()=>$('stTimerWrap').hidden=!$('stTimerEnabled').checked;
   $('stSave').onclick=saveStage;
   $('stCancel').onclick=()=>$('ovStageEdit').hidden=true;
@@ -847,35 +889,31 @@ function init(){
   $('edSave').onclick=savePoint;
   $('edCancel').onclick=()=>$('ovPointEdit').hidden=true;
   $('edDelete').onclick=()=>{if(S.editingPoint){$('ovPointEdit').hidden=true;delPoint(S.editingPoint);}};
-  /* config */
-  const openCfg=()=>{$('cfgUrl').value=CFG.url;$('cfgKey').value=CFG.key;$('cfgStatus').textContent='';$('ovCfg').hidden=false;};
-  $('btnCfg').onclick=openCfg;$('btnCfg2').onclick=openCfg;
+  $('btnCfg').onclick=()=>openCfg();
+  $('btnCfg2').onclick=()=>openCfg();
   $('btnCfgClose').onclick=()=>$('ovCfg').hidden=true;
-  $('btnCfgSave').onclick=()=>{CFG.url=$('cfgUrl').value.trim();CFG.key=$('cfgKey').value.trim();
-    localStorage.setItem(CFG_KEY,JSON.stringify({url:CFG.url,key:CFG.key}));$('ovCfg').hidden=true;toast('💾 Подключение сохранено');};
-  $('btnCfgTest').onclick=async()=>{
-    $('cfgStatus').textContent='⏳ проверяю...';
-    try{const r=await fetch($('cfgUrl').value.trim()+'/rest/v1/scenarios?select=slug&limit=1',
-      {headers:{apikey:$('cfgKey').value.trim(),Authorization:'Bearer '+$('cfgKey').value.trim()}});
-      $('cfgStatus').textContent=r.ok?'✅ связь есть':'❌ БД ответила '+r.status;
-    }catch(e){$('cfgStatus').textContent='❌ '+e.message;}};
-  /* geolocation */
+  $('btnCfgExtract').onclick=extractCfg;
+  $('btnCfgTest').onclick=testCfg;
+  $('btnCfgSave').onclick=()=>{CFG.url=$('cfgUrl').value.trim().replace(/\/+$/,'');CFG.key=$('cfgKey').value.trim();
+    localStorage.setItem(CFG_KEY,JSON.stringify({url:CFG.url,key:CFG.key}));$('ovCfg').hidden=true;
+    toast('💾 Подключение сохранено. Введи код квеста 🔑.');};
   if(navigator.geolocation){
     navigator.geolocation.watchPosition(p=>{if(!S.test)setPos(p.coords.latitude,p.coords.longitude,p.coords.accuracy);},
       e=>{$('geoStatus').textContent='🛰 геолокация недоступна: '+e.message+' — включи 🧪 Тест';},
       {enableHighAccuracy:true,maximumAge:3000,timeout:12000});
   }else $('geoStatus').textContent='🛰 геолокации нет — включи 🧪 Тест';
-  /* fox completion watcher */
   setInterval(()=>{
-    if(S.mode==='fox'){const st=currentStage();
-      if(st&&st.rule_type==='foxhunter'){const qs=stagePoints(st);
-        if(qs.length&&qs.every(q=>S.opened.has(String(q.id)))&&!$('ovFoxDone').hidden===false){$('ovFoxDone').hidden=false;chime();}}
-      renderPanels();}
-    if(S.phase==='bonus')renderPanels();
+    if(S.mode==='fox'||S.phase==='bonus'){
+      const p=S.phase==='bonus'?nearestUnopened(bonusStage()):S.points.find(q=>String(q.id)===String(S.foxId));
+      const sig=signalTo(p,S.phase==='bonus'?300:250);
+      if(sig>0&&!S.arrived)beep(300+sig*9,.05,.03);
+      renderPanels();
+    }
   },700);
-  refresh();
+  startDemo();
 }
 document.addEventListener('DOMContentLoaded',init);
 </script>
 </body>
 </html>
+```
