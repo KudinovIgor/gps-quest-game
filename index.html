@@ -1613,14 +1613,11 @@ function renderCard(){
   }
 
   // есть цель — показываем карточку точки, стрелку и расстояние не прячем
-  const st=currentStage();
-  const isStory=st&&(st.rule_type==='story'||st.kind==='story');
   T.textContent=(isStory?'📜 ':'📍 ')+t.title;
   D.textContent=t.desc||t.description||'Подойди к точке — там тебя ждёт '+(isStory?'страница истории':'загадка')+'.';
   if(ar)ar.hidden=false;
   if(hl)hl.hidden=true;
   hide(bg);
-  const inQuiz = !!(S.foxQuiz||S.bonusQuiz);
   const canAns  = S.atPoint || inQuiz;
   $('answerInput').disabled = !canAns;
   $('answerBtn').disabled   = !canAns;
