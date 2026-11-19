@@ -1606,11 +1606,12 @@ function renderCard(){
 
   if(!S.atPoint && !inQuiz){
     // === СОСТОЯНИЕ 1: ИДЁМ К ТОЧКЕ ===
+    $('card').classList.remove('centered');  // ← ДОБАВИТЬ ЭТУ СТРОКУ
     T.textContent='📍 '+t.title;
     D.textContent=isStory?'Подойди к кругу — откроется страница истории.'
                           :'Подойди к точке — там тебя ждёт загадка.';
     hide(ar);hide(hl);hide(bg);
-    if(Dist&&S.pos){ Dist.textContent='≈ '+Math.round(dbgDist(S.pos[0],S.pos[1],t.lat,t.lng))+' м · направляйся к точке'; }
+    if(Dist&&S.pos){ Dist.textContent='≈ '+Math.round(dbgDist(S.pos[0],S.pos[1],t.lat,t.lng))+' м'; }
     else if(Dist){ Dist.textContent=''; }
     $('answerRow').hidden=true;
     $('answerInput').value='';
@@ -1618,13 +1619,13 @@ function renderCard(){
   }
 
   // === СОСТОЯНИЕ 2: МЫ У ТОЧКИ (или открыта загадка лисы/бонуса) ===
-  $('card').classList.add('centered');
+  $('card').classList.add('centered');  // ← ДОБАВИТЬ ЭТУ СТРОКУ
   T.textContent=(isStory?'📜 ':'🎯 ')+t.title;
   D.textContent=t.desc||t.description||'Загадка ждёт ответа.';
   if(ar)ar.hidden=false;
   if(hl)hl.hidden=true;
   hide(bg);
-  if(Dist){ Dist.textContent=''; }  // ← УБИРАЕМ расстояние когда мы у точки
+  if(Dist){ Dist.textContent=''; }
 
   if(!isStory){
     $('answerRow').hidden=false;
