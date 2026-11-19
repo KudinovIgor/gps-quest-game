@@ -40,22 +40,21 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 @media (max-width: 600px) { #ovPointEdit .ed::-webkit-scrollbar { width: 0 }
   #ovPointEdit .ed {padding-right: 4px}
 }
-/* ===== РЕДАКТОР ЭТАПОВ ===== */
-/* ===== Окно "Этапы квеста" — стиль как в новом проекте ===== */
-.stages-box{max-width:760px;width:94vw;max-height:92vh;padding:0;display:flex;
-  flex-direction:column;text-align:initial;overflow:hidden;
-  background:linear-gradient(170deg,#0d1626,#0a1a2c)}
-.stages-box h2{margin:0;padding:14px 16px;text-align:center;color:var(--cy);
-  font-size:18px;border-bottom:1px solid #16324a;flex:0 0 auto}
-.stages-scroll{flex:1;overflow-y:auto;padding:10px 14px;scrollbar-gutter:stable;
-  -webkit-overflow-scrolling:touch}
-.stages-box>button{flex:0 0 auto;width:calc(100% - 28px);margin:0 14px 10px;
-  border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;border:0}
-.stages-box .big-cyan{background:var(--cy);color:#032}
-.stages-box .big-cyan:active{filter:brightness(1.15)}
-.stages-box .big-sec{background:transparent;border:1px solid #1d4a63;color:var(--txt);
-  font-weight:500;margin-bottom:14px}
-.stages-box .big-sec:hover{border-color:var(--cy);color:var(--cy)}
+/* ===== Окно "Этапы квеста" ===== */
+.stages-box { max-width: 760px; width: 94vw; max-height: 92vh; padding: 0; display: flex; flex-direction: column; text-align: initial; overflow: hidden; background: linear-gradient(170deg, #0d1626, #0a1a2c)}
+.stages-box h2 { margin: 0; padding: 14px 16px; text-align: center; color: var(--cy); font-size: 18px; border-bottom: 1px solid #16324a; flex: 0 0 auto}
+.stages-scroll { flex: 1; overflow-y: auto; padding: 10px 14px; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch}
+
+/* Кнопки "+ Новый этап" и "Закрыть" — только прямые дети окна */
+.stages-box > button { flex: 0 0 auto; width: calc(100% - 28px); margin: 0 14px 10px; border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700; cursor: pointer; border: 0}
+
+/* Кнопка "+ Новый этап" — голубая */
+.stages-box > button#btnAddStage { background: var(--cy); color: #032}
+.stages-box > button#btnAddStage:active { filter: brightness(1.15)}
+
+/* Кнопка "Закрыть" — прозрачная с рамкой */
+.stages-box > button#edCancel { background: transparent; border: 1px solid #1d4a63; color: var(--txt); font-weight: 500; margin-bottom: 14px}
+.stages-box > button#edCancel:hover { border-color: var(--cy); color: var(--cy)}
 
 .stage-block{border:1px solid #1d4a63;border-radius:10px;margin:10px 0;overflow:hidden;background:#0d1626}
 .stage-header{background:#102a3c;padding:9px 10px;display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
