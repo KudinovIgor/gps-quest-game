@@ -394,12 +394,14 @@ const bonuses = () => getPointsByType('bonus');
 const foxes = () => getPointsByType('foxhunter');
 const stories = () => getPointsByType('story');
  
-const target=()=>{
- const st=currentStage();
- if(!st||st.kind!=='main')
-  return undefined;
- return st.qs.find(q=>!S.opened.has(String(q.id)));
-};
+function target(){
+  const st=currentStage();
+  if(!st) return undefined;
+  const t=st.rule_type||st.kind;
+  if(t==='foxhunter'||t==='bonus') return undefined;
+  return st.qs.find(q=>!S.opened.has(String(q.id)));
+}
+
 /* ---------- карта (Leaflet + OpenStreetMap, БЕЗ ключей) ---------- */
 let map,userMark,accCircle,targetMark,openedLayer,debugLayer=null,zoneCircle,dirMark;
 const pulseIcon=L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[36,36],iconAnchor:[18,18]});
@@ -530,65 +532,37 @@ function getStages(){
   if(!cachedStages) cachedStages=computeStages();
   return cachedStages;
 }
-function currentStage() {
-  if (!S.stages || !S.stages.length) return null;
-  
-  // Ищем первый НЕЗАВЕРШЁННЫЙ этап
-  for (let i = 0; i < S.stages.length; i++) {
-    const stage = S.stages[i];
-    const stagePoints = (S.points || []).filter(p => p.stage_id === stage.id);
-    const openedCount = stagePoints.filter(p => S.opened.has(String(p.id))).length;
-    
-    // Если этап не завершён — возвращаем его
-    if (openedCount < stagePoints.length) {
-      stage.idx = i;
-      stage.qs = stagePoints.sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
-      return stage;
-    }
+function currentStage(){
+  const stages=(S.stages||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  if(!stages.length) return null;
+  for(let i=0;i<stages.length;i++){
+    const st=stages[i];
+    const qs=(S.points||[]).filter(p=>p.stage_id===st.id)
+      .sort((a,b)=>(a.stage_order||0)-(b.stage_order||0));
+    const opened=qs.filter(p=>S.opened.has(String(p.id))).length;
+    if(!qs.length || opened<qs.length){ st.idx=i; st.qs=qs; return st; }
   }
-  
-  // Все этапы завершены
   return null;
 }
+
 function foxStageActive(){const st=currentStage();return !!st&&st.kind==='foxhunter';}
+
 function foxStageRange(){
   const st=currentStage();
   if(!st||st.kind!=='foxhunter')return CONFIG.foxRange;
   return Math.max(150,st.rM*2);   // компактный этап = чувствительный эфир
 }
 function showStory(q){S.story=q;$('storyTitle').textContent=q.title||'📜 История';$('storyText').textContent=q.desc||'';$('ovStory').hidden=false;}
-function presentStage() {
-  const stage = currentStage();
-  
-  if (!stage) {
-    // Нет этапов или все завершены
-    $('cardTitle').textContent = '🏁 Квест завершён';
-    $('cardDesc').textContent = 'Спасибо за игру!';
-    $('cardDist').textContent = '';
-    $('answerRow').hidden = true;
-    $('hintLine').hidden = true;
-    $('btnBonusGo').hidden = true;
-    return;
-  }
-  // Бонусный этап — показываем окно
-  if (stage.rule_type === 'bonus' || stage.kind === 'bonus') {
-    updateBonusUI();
-    $('ovBonus').hidden = false;
-    return;
-  }
-  // Лисы — переключаем режим
-  if (stage.rule_type === 'foxhunter' || stage.kind === 'foxhunter') {
-    setMode('fox');
-    return;
-  }
-  // История — показываем карточку
-  if (stage.rule_type === 'story' || stage.kind === 'story') {
-    // TODO: логика показа истории
-    return;
-  }
-  // Обычный этап
-  updateGame();
+
+function presentStage(){
+  const st=currentStage();
+  if(!st){ updateGame(); return; }
+  const t=st.rule_type||st.kind;
+  if(t==='bonus'){ if(typeof updateBonusUI==='function')updateBonusUI(); const ov=$('ovBonus'); if(ov)ov.hidden=false; return; }
+  if(t==='foxhunter'){ setMode('fox'); return; }
+  updateGame(); // linear / story / sequence / flashlight — все ведут к точке
 }
+
 function syncFactOverlay(){
   const ov=$('ovFact');
   if(S.fact){
@@ -1070,34 +1044,66 @@ async function rpcSaveStage(stageData) {
 $('btnAddStage').onclick = () => openStageEditor(null);
 /* ========================================================== */
 
+function dbgDist(a,b,c,d){
+  const R=6371000,t=x=>x*Math.PI/180;
+  const dLa=t(c-a),dLo=t(d-b);
+  const h=Math.sin(dLa/2)**2+Math.cos(t(a))*Math.cos(t(c))*Math.sin(dLo/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+
 /* ---------- отладка: этапы и точки с номерами ---------- */
-function renderDebug(fit) {
-  if (debugLayer) { map.removeLayer(debugLayer); debugLayer = null; }
-  if (!S.debug) return;
- 
-  debugLayer = L.layerGroup().addTo(map);
-  
-  const PAL = { linear: '#ffc857', bonus: '#6c9bd2', foxhunter: '#c77dff', story: '#8ab4f8', flashlight: '#00e5ff', sequence: '#ff5470' };
-  
-  // 1. Рисуем этапы и их точки
-  if (S.stages && S.stages.length) {
-    S.stages.forEach((stage, stageIdx) => {
-      const stagePoints = S.points.filter(p => p.stage_id === stage.id).sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
-      const col = PAL[stage.rule_type] || '#8ab4f8';
-      
-      if (stagePoints.length > 1) {
-        const centerLat = stagePoints.reduce((sum, p) => sum + p.lat, 0) / stagePoints.length;
-        const centerLng = stagePoints.reduce((sum, p) => sum + p.lng, 0) / stagePoints.length;
-        const maxDist = Math.max(...stagePoints.map(p => distM(centerLat, centerLng, p.lat, p.lng)));
-        
-        L.circle([centerLat, centerLng], { radius: maxDist, color: col, weight: 2, opacity: .85, dashArray: '8 6', fillColor: col, fillOpacity: .06, interactive: false }).addTo(debugLayer);
-        L.marker([centerLat, centerLng], { icon: L.divIcon({ className: '', html: '<div class="dbg stage" style="background:' + col + ';color:#0a1420">Э' + (stageIdx + 1) + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] }), zIndexOffset: 400 })
-          .bindTooltip('Э' + (stageIdx + 1) + ': ' + stage.title, { direction: 'top', offset: [0, -14] }).addTo(debugLayer);
+function renderDebug(fit){
+  if(debugLayer){ map.removeLayer(debugLayer); debugLayer=null; }
+  if(!S.debug) return;
+  debugLayer=L.layerGroup().addTo(map);
+  const PAL={linear:'#ffc857',main:'#ffc857',bonus:'#6c9bd2',foxhunter:'#c77dff',story:'#8ab4f8',flashlight:'#00e5ff',sequence:'#ff5470'};
+  const stages=(S.stages||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const chain=[];           // сквозная нить маршрута
+  let prevTail=null;        // хвост предыдущего этапа
+
+  stages.forEach((st,si)=>{
+    const col=PAL[st.rule_type]||PAL[st.kind]||'#8ab4f8';
+    const pts=(S.points||[]).filter(p=>p.stage_id===st.id)
+      .sort((a,b)=>(a.stage_order||0)-(b.stage_order||0));
+    if(!pts.length) return;
+
+    // связка между этапами: хвост прошлого → голова текущего
+    if(prevTail){
+      L.polyline([prevTail,[pts[0].lat,pts[0].lng]],{color:'#5b7a94',weight:2,opacity:.8,dashArray:'2 7',interactive:false}).addTo(debugLayer);
+    }
+
+    // внутренняя нить этапа
+    if(pts.length>1){
+      L.polyline(pts.map(p=>[p.lat,p.lng]),{color:col,weight:3,opacity:.9,interactive:false}).addTo(debugLayer);
+    }
+
+    // описывающая окружность + центр + спицы для групповых этапов
+    if(pts.length>1){
+      const cLa=pts.reduce((s,p)=>s+p.lat,0)/pts.length;
+      const cLo=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
+      const rad=Math.max(...pts.map(p=>dbgDist(cLa,cLo,p.lat,p.lng)));
+      L.circle([cLa,cLo],{radius:rad,color:col,weight:1.5,opacity:.7,dashArray:'8 6',fillColor:col,fillOpacity:.05,interactive:false}).addTo(debugLayer);
+      L.marker([cLa,cLo],{icon:L.divIcon({className:'',html:'<div class="dbg stage" style="background:'+col+';color:#0a1420">Э'+(si+1)+'</div>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:400,interactive:false})
+        .bindTooltip('Э'+(si+1)+': '+st.title+' ('+(st.rule_type||st.kind)+') · точек: '+pts.length,{direction:'top',offset:[0,-14]}).addTo(debugLayer);
+      if(st.rule_type==='foxhunter'||st.rule_type==='bonus'){
+        pts.forEach(p=>L.polyline([[cLa,cLo],[p.lat,p.lng]],{color:col,weight:1.2,opacity:.5,interactive:false}).addTo(debugLayer));
       }
-      
-      stagePoints.forEach((q, pointIdx) => mk(q, (stageIdx + 1) + '.' + (pointIdx + 1), '', col));
+    }
+
+    pts.forEach((q,pi)=>{
+      mk(q,(si+1)+'.'+(pi+1),'',col);
+      chain.push([q.lat,q.lng]);
     });
-  }
+    prevTail=[pts[pts.length-1].lat,pts[pts.length-1].lng];
+  });
+
+  // точки без этапа (или с битым stage_id) — серые, в нить не входят
+  (S.points||[]).filter(p=>!p.stage_id||!stages.some(s=>s.id===p.stage_id))
+    .forEach((q,i)=>mk(q,'?'+(i+1),'orphan','#666'));
+
+  if(fit&&chain.length) map.fitBounds(L.latLngBounds(chain),{padding:[50,50]});
+}
+
   
   // 2. Точки без этапа ИЛИ с битым stage_id — рисуем серым
   const orphanPoints = S.points.filter(p => !p.stage_id || !S.stages.some(st => st.id === p.stage_id));
@@ -1109,16 +1115,13 @@ function renderDebug(fit) {
 }
 
 // Вспомогательная функция (должна быть СРАЗУ ПОСЛЕ renderDebug)
-function mk(q, label, cls, color) {
-  const m = L.marker([q.lat, q.lng], {
-    icon: L.divIcon({ className: '', html: '<div class="dbg ' + cls + (S.delMode ? ' del' : '') + '" style="border-color:' + color + '">' + label + '</div>', iconSize: [24, 24], iconAnchor: [12, 12] }),
-    zIndexOffset: 500, draggable: true
-  })
-  .bindTooltip(label + '. ' + q.title + ' | id=' + q.id + ' | тяни=перенос, клик=редактор', { direction: 'top', offset: [0, -10] })
-  .addTo(debugLayer);
-
-  m.on('dragend', () => { const p = m.getLatLng(); q.lat = p.lat; q.lng = p.lng; onQuestMoved(q, label); });
-  m.on('click', () => { if (S.delMode) delById(q, label); else openPointEditor(q, q.stage_id); });
+function mk(q,label,cls,color){
+  const m=L.marker([q.lat,q.lng],{
+    icon:L.divIcon({className:'',html:'<div class="dbg '+cls+(S.delMode?' del':'')+'" style="border-color:'+color+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),
+    zIndexOffset:500,draggable:true
+  }).bindTooltip(label+'. '+q.title+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]}).addTo(debugLayer);
+  m.on('dragend',()=>{const p=m.getLatLng();q.lat=p.lat;q.lng=p.lng;onQuestMoved(q,label);});
+  m.on('click',()=>{ if(S.delMode){ if(typeof delById==='function')delById(q,label); } else openPointEditor(q,q.stage_id); });
 }
  
 // Обновим toggleDebug, чтобы показывать/скрывать кнопку "Этапы"
@@ -1162,57 +1165,60 @@ function askEditorPass(){
   });
 }
 async function saveQuestPos(q){
-  let pass=sessionStorage.getItem('gq_editor_pass');
-  if(pass&&await rpcMove(q,pass))return true;
-  pass=await askEditorPass();
-  if(!pass)return false;
-  const ok=await rpcMove(q,pass);
-  if(ok)sessionStorage.setItem('gq_editor_pass',pass);
-  else toast('❌ Неверный пароль редактора.');
-  return ok;
+  const pass = await ensurePass();
+  if(!pass) return false;
+  try{
+    const r = await fetch(CONFIG.supabaseUrl+'/rest/v1/rpc/move_quest',{
+      method:'POST',
+      headers:{apikey:CONFIG.supabaseAnonKey,Authorization:'Bearer '+CONFIG.supabaseAnonKey,'Content-Type':'application/json'},
+      body:JSON.stringify({p_id:Number(q.id),p_lat:q.lat,p_lng:q.lng,p_pass:pass})
+    });
+    if(!r.ok){ toast('⚠️ БД ответила '+r.status); return false; }
+    const ok = (await r.json())===true;
+    if(!ok){ sessionStorage.removeItem('gq_editor_pass'); toast('🔑 Пароль не принят — введи ещё раз при следующем сохранении.'); }
+    return ok;
+  }catch(e){ toast('⚠️ Сеть: '+e.message); return false; }
 }
+
 async function onQuestMoved(q,label){
-  renderDebug();updateGame();
-  if(S.scenario.slug==='demo'){toast('🧪 Точка '+label+' перенесена (демо, в БД не пишется): '+q.lat.toFixed(5)+', '+q.lng.toFixed(5),6000);return;}
+  renderDebug(); updateGame();
+  if(S.scenario.slug==='demo'){ toast('🧪 Точка '+label+' перенесена (демо, в БД не пишется): '+q.lat.toFixed(5)+', '+q.lng.toFixed(5),6000); return; }
   toast('📍 Точка '+label+': '+q.lat.toFixed(5)+', '+q.lng.toFixed(5)+' — сохраняю...');
-  if(await saveQuestPos(q))toast('💾 Точка '+label+' сохранена в БД.');
+  if(await saveQuestPos(q)) toast('💾 Точка '+label+' сохранена в БД.');
 }
 
 /* ---------- админ-редактор: создать / изменить / удалить ---------- */
-async function ensurePass() {
-  // Если пароль уже есть в сессии, молча возвращаем true
-  if (sessionStorage.getItem('gq_editor_pass')) {
-    return true;
-  }
-
-  $('ovPass').hidden = false;
-  $('passInput').value = '';
-  $('passInput').focus();
-
-  return new Promise(resolve => {
-    const check = () => {
-      const val = $('passInput').value.trim();
-      // ЗАМЕНИ 'admin' на свой реальный пароль
-      if (val === 'admin') { 
-        // Сохраняем САМ пароль, а не просто слово 'verified'
-        sessionStorage.setItem('gq_editor_pass', val); 
-        $('ovPass').hidden = true;
-        resolve(true);
-      } else {
-        toast('❌ Неверный пароль редактора');
-        $('passInput').value = '';
-        $('passInput').focus();
-      }
+/* ---------- 1. ПАРОЛЬ: один раз за сеанс ---------- */
+function ensurePass(){
+  const cached = sessionStorage.getItem('gq_editor_pass');
+  if (cached) return Promise.resolve(cached);
+  return new Promise(resolve=>{
+    let ov = document.getElementById('gqPassOv');
+    if(!ov){
+      ov = document.createElement('div');
+      ov.id='gqPassOv';
+      ov.style.cssText='position:fixed;inset:0;background:rgba(4,10,18,.82);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+      ov.innerHTML =
+        '<div style="background:#0d1626;border:1px solid #00e5ff;border-radius:14px;box-shadow:0 0 34px rgba(0,229,255,.25);max-width:340px;width:100%;padding:20px">'+
+        '<h2 style="margin:0 0 6px;color:#00e5ff;font-size:18px">🛠 Пароль редактора</h2>'+
+        '<p style="margin:0 0 12px;color:#8ab4d8;font-size:13px">Один раз за сеанс. Дальше сохранения идут без запроса.</p>'+
+        '<input id="gqPassInp" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;background:#071019;border:1px solid #1d4a63;color:#eaf6ff;border-radius:8px;padding:10px;font-size:15px" placeholder="Пароль">'+
+        '<div style="display:flex;gap:8px;margin-top:12px">'+
+        '<button id="gqPassOk" style="flex:1;background:#00e5ff;color:#04121c;border:0;border-radius:8px;padding:10px;font-weight:700;cursor:pointer">Войти</button>'+
+        '<button id="gqPassNo" style="flex:1;background:transparent;color:#8ab4d8;border:1px solid #1d4a63;border-radius:8px;padding:10px;cursor:pointer">Отмена</button>'+
+        '</div></div>';
+      document.body.appendChild(ov);
+    }
+    const inp=ov.querySelector('#gqPassInp');
+    const done=v=>{ov.style.display='none';inp.value='';resolve(v);};
+    ov.querySelector('#gqPassOk').onclick=()=>{
+      const v=inp.value.trim();
+      if(!v){inp.focus();return;}
+      sessionStorage.setItem('gq_editor_pass',v); done(v);
     };
-
-    $('btnPassOk').onclick = check;
-    $('btnPassCancel').onclick = () => {
-      $('ovPass').hidden = true;
-      resolve(false);
-    };
-    $('passInput').onkeydown = (e) => { 
-      if (e.key === 'Enter') check(); 
-    };
+    ov.querySelector('#gqPassNo').onclick=()=>done(null);
+    inp.onkeydown=e=>{if(e.key==='Enter')ov.querySelector('#gqPassOk').click();};
+    ov.style.display='flex'; setTimeout(()=>inp.focus(),60);
   });
 }
 
@@ -1536,106 +1542,44 @@ function renderRadarList(){
 function renderFrags(){
   $('frags').innerHTML=bonuses().map(q=>{const got=S.opened.has(String(q.id));return '<span class="frag'+(got?'':' lock')+'">'+(got?(q.fragment||q.title):'???')+'</span>';}).join('');
 }
+
 function renderCard(){
-  const bi=$('bonusInfo'),ar=$('answerRow'),hl=$('hintLine'),bg=$('btnBonusGo');
-  let qid=null;
-  if(S.foxQuiz)qid='F'+S.foxQuiz.id;
-  else if(S.bonusQuiz)qid='B'+S.bonusQuiz.id;
-  else if(S.mode!=='fox'&&S.phase!=='bonus'){
-    const tt=target();
-    if(tt&&S.pos&&distM(S.pos[0],S.pos[1],tt.lat,tt.lng)<=tt.radius)qid='M'+tt.id;
-  }
-  if(qid!==S.shownQid){ $('answerInput').value=''; S.shownQid=qid; }   // новый вопрос — чистое поле 
-  if(!S.points.length){
-    $('cardTitle').textContent='🔑 Ждём загрузки квеста';
-    $('cardDesc').textContent='Введи кодовое слово в приветственном окне — и маршрут появится на карте.';
-    $('cardDist').textContent='';
-    bi.hidden=true;ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
-  }
-  if(S.phase==='won'){$('card').hidden=true;return;}
-  /* --- факт теперь живёт в центральном оверлее ovFact --- */
-  if(S.fact){ $('card').hidden=true; return; }
-  if(S.mode==='fox'&&!S.foxQuiz){$('card').hidden=true;return;}   // в охоте карточка не нужна, кроме загадки лисы
-  $('card').hidden=false;
-  if(S.phase==='bonus'&&S.bonusQuiz){
-    const bq=S.bonusQuiz;
-    bg.hidden=true;
-    $('cardTitle').textContent='🔎 '+bq.title;
-    $('cardDist').textContent='✅ Точка найдена! Отвечай на загадку.';
-    $('cardDesc').textContent=bq.desc||'';
-    bi.hidden=true;ar.hidden=false;
-    $('answerInput').disabled=false;$('answerBtn').disabled=false;
-    const wb=S.wrong[bq.id]||0;
-    if(wb>=2&&bq.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+bq.hint;}else hl.hidden=true;
-    return;
-  } 
-  if(S.phase==='bonus'){
-    $('cardTitle').textContent='🔑 Бонус-рейд: собери фрагменты!';
-    $('cardDesc').textContent='На радаре — скрытые точки. Подойди к каждой вплотную, фрагмент добавится сам.';
-    $('cardDist').textContent='Осталось точек: '+bonuses().filter(q=>!S.opened.has(String(q.id))).length;
-    bi.hidden=false;ar.hidden=true;hl.hidden=true;bg.hidden=true;renderFrags();return;
-  }
-  bi.hidden=true;
-  if(S.mode==='fox'&&S.foxQuiz){
-    const fq=S.foxQuiz;
-    bg.hidden=true;
-    $('cardTitle').textContent='🦊 '+fq.title;
-    $('cardDist').textContent='✅ Лиса в ловушке! Отвечай на загадку.';
-    $('cardDesc').textContent=fq.desc||'';
-    ar.hidden=false;
-    $('answerInput').disabled=false;$('answerBtn').disabled=false;
-    const wq=S.wrong[fq.id]||0;
-    if(wq>=2&&fq.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+fq.hint;}else hl.hidden=true;
-    return;
-  }
+  const T=$('cardTitle'),D=$('cardDesc'),Dist=$('cardDist');
+  const ar=$('ar')||$('arrow'), hl=$('hintLine'), bg=$('btnBonusGo');
+  const hide=el=>{if(el)el.hidden=true;};
   const t=target();
+
+  if(S.story){ T.textContent='📜 Страница истории'; D.textContent='Читай окно истории — после «Далее» маршрут продолжится.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
+  if(S.fact){ T.textContent='✅ Загадка решена'; D.textContent='Читай факт о месте — затем следующая точка.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
+  if(S.phase==='bonus'){ T.textContent='📡 Бонус-рейд'; D.textContent='Только радар: ищи скрытые точки по силе сигнала.'; if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return; }
+
   if(!t){
     const st=currentStage();
-  // Если этапов вообще нет — показываем правильное сообщение
-  if (!S.stages || !S.stages.length) {
-    $('cardTitle').textContent = '⚙️ Этапы не настроены';
-    $('cardDesc').textContent = 'Включи режим 🐞 Отладка и нажми 📋 Этапы, чтобы создать этапы и распределить точки.';
-    $('cardDist').textContent = '';
-    ar.hidden = true; hl.hidden = true; bg.hidden = true;
-    return;
-  }   
-  if (st && (st.rule_type === 'foxhunter' || st.kind === 'foxhunter')) {
-      $('cardTitle').textContent='🦊 Идёт лисий этап';
-      $('cardDesc').textContent='Поймай всех лис этапа в режиме 🦊 — маршрут продолжится сам.';
-      $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
+    if(!S.stages||!S.stages.length){
+      T.textContent='⚙️ Этапы не настроены';
+      D.textContent='Включи 🐞 Отладку и нажми 📋 Этапы, чтобы создать этапы и распределить точки.';
+    }else if(st&&(st.rule_type==='foxhunter')){
+      T.textContent='🦊 Идёт лисий этап'; D.textContent='Поймай всех лис в режиме 🦊 — маршрут продолжится сам.';
+    }else if(st&&(st.rule_type==='bonus')){
+      T.textContent='📡 Бонус-рейд доступен'; D.textContent='Начни рейд, когда будешь готов.';
+    }else{
+      T.textContent='🏁 Этап завершён'; D.textContent='Следующий этап начнётся автоматически.';
     }
-  if (st && (st.rule_type === 'story' || st.kind === 'story')) {
-      $('cardTitle').textContent='📜 Страница истории';
-      $('cardDesc').textContent='Читай окно истории — после «Далее» маршрут продолжится.';
-      $('cardDist').textContent='';ar.hidden=true;hl.hidden=true;bg.hidden=true;return;
-    } 
-  $('cardTitle').textContent = '🏁 Этап завершён';
-  $('cardDesc').textContent = 'Следующий этап начнётся автоматически, или читай карточку истории.';
-  $('cardDist').textContent = ''; ar.hidden = true; hl.hidden = true; bg.hidden = true;
-  return;
+    if(Dist)Dist.textContent=''; hide(ar);hide(hl);hide(bg); return;
   }
-  bg.hidden=true;
-  let dTxt;
-  if(S.pos){
-    const d=distM(S.pos[0],S.pos[1],t.lat,t.lng);
-    S.atPoint=d<=t.radius;
-    dTxt=S.atPoint?'✅ Ты на точке! Загадка открыта.':'📏 До точки: '+fmtDist(d)+' ('+dirName(bearing(S.pos[0],S.pos[1],t.lat,t.lng))+')';
-  } else {S.atPoint=false;dTxt='🛰 Ждём координаты...';}
-  $('cardTitle').textContent=S.atPoint?('🎯 '+t.title):('🎯 Точка '+(mains().indexOf(t)+1)+' из '+mains().length);
-  $('cardDist').textContent=dTxt;
-  if(S.atPoint){
-    /* дошли: показываем загадку и поле ответа */
-    $('cardDesc').textContent=t.desc||'';
-    ar.hidden=false;
-    $('answerInput').disabled=false;$('answerBtn').disabled=false;
-    const w=S.wrong[t.id]||0;
-    if(w>=2&&t.hint){hl.hidden=false;hl.textContent='💡 Подсказка: '+t.hint;}else hl.hidden=true;
-  } else {
-    /* ещё в пути: загадку не показываем, чтобы не спойлерить */
-    $('cardDesc').textContent='🔒 Загадка откроется, когда подойдёшь к точке.';
-    ar.hidden=true;hl.hidden=true;
-  }
+
+  // есть цель — показываем карточку точки, стрелку и расстояние не прячем
+  const st=currentStage();
+  const isStory=st&&(st.rule_type==='story'||st.kind==='story');
+  T.textContent=(isStory?'📜 ':'📍 ')+t.title;
+  D.textContent=t.desc||t.description||'Подойди к точке — там тебя ждёт '+(isStory?'страница истории':'загадка')+'.';
+  if(ar)ar.hidden=false;
+  if(hl)hl.hidden=true;
+  hide(bg);
+  if(Dist&&S.pos){ Dist.textContent='≈ '+Math.round(dbgDist(S.pos[0],S.pos[1],t.lat,t.lng))+' м'; }
+  else if(Dist){ Dist.textContent=''; }
 }
+
 function submitAnswer(){
   if(S.foxQuiz){
     const fq=S.foxQuiz;
