@@ -714,18 +714,20 @@ function renderStagesEditor() {
 
 
 function toggleStage(stageEl, pointsList, toggleBtn) {
-  const isOpen = pointsList.style.display !== 'none';
-  pointsList.style.display = isOpen ? 'none' : 'block';
-  toggleBtn.textContent = isOpen ? '▶' : '▼';
-}
-
-function makeIconBtn(icon, title, onclick) {
-  const btn = document.createElement('button');
-  btn.className = 'icon-btn';
-  btn.textContent = icon;
-  btn.title = title;
-  btn.onclick = (e) => { e.stopPropagation(); onclick(); };
-  return btn;
+  // Проверяем, открыт ли сейчас список
+  const isOpen = pointsList.style.display === 'block';
+  
+  if (isOpen) {
+    // Если открыт — закрываем
+    pointsList.style.display = 'none';
+    toggleBtn.textContent = '▶';
+    toggleBtn.classList.remove('open'); 
+  } else {
+    // Если закрыт — открываем
+    pointsList.style.display = 'block';
+    toggleBtn.textContent = '▼';
+    toggleBtn.classList.add('open'); 
+  }
 }
 
 // Универсальная анимация перемещения: ищет блок по data-атрибуту и "дёргает" его
