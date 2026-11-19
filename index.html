@@ -164,6 +164,26 @@ header{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(-
 }
 .anim-move-up   { animation: slideUp 0.35s ease; }
 .anim-move-down { animation: slideDown 0.35s ease; }
+/* Карточка по центру экрана (когда мы у точки) */
+#card.centered {
+  bottom: 50%;
+  transform: translate(-50%, 50%);
+  max-height: 60vh;
+  animation: cardExpand 0.4s ease;
+}
+
+@keyframes cardExpand {
+  from {
+    bottom: 12px;
+    transform: translateX(-50%);
+    max-height: 120px;
+  }
+  to {
+    bottom: 50%;
+    transform: translate(-50%, 50%);
+    max-height: 60vh;
+  }
+}
 </style>
 </head>
 <body>
@@ -1596,13 +1616,13 @@ function renderCard(){
   }
 
   // === СОСТОЯНИЕ 2: МЫ У ТОЧКИ (или открыта загадка лисы/бонуса) ===
+  $('card').classList.add('centered');
   T.textContent=(isStory?'📜 ':'🎯 ')+t.title;
   D.textContent=t.desc||t.description||'Загадка ждёт ответа.';
   if(ar)ar.hidden=false;
   if(hl)hl.hidden=true;
   hide(bg);
-  if(Dist&&S.pos){ Dist.textContent='📍 ты у точки'; }
-  else if(Dist){ Dist.textContent=''; }
+  if(Dist){ Dist.textContent=''; }  // ← УБИРАЕМ расстояние когда мы у точки
 
   if(!isStory){
     $('answerRow').hidden=false;
