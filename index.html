@@ -752,7 +752,10 @@ function currentStage(){
   return null;
 }
 
-function foxStageActive(){const st=currentStage();return !!st&&st.kind==='foxhunter';}
+function foxStageActive(){
+  const st = currentStage();
+  return !!st && (st.rule_type || st.kind) === 'foxhunter';
+}
 
 function foxStageRange(){
   const st = currentStage();
@@ -787,15 +790,12 @@ function syncFactOverlay(){
   } else if(!ov.hidden) ov.hidden=true;
 } 
 
-
-
-
-  
 function foxStageQuests(){
-  const st=currentStage();
-  if(st&&st.kind==='foxhunter')return st.qs;   // кнопки = лисы ТЕКУЩЕГО этапа
+  const st = currentStage();
+  if (st && (st.rule_type || st.kind) === 'foxhunter') return st.qs; // кнопки = лисы ТЕКУЩЕГО этапа
   return foxes();
 }
+  
 function renderFoxSel(){
   const list=foxStageQuests(), row=$('foxSelRow');
   row.innerHTML='';
@@ -997,7 +997,8 @@ async function movePointInStage(point, stage, direction) {
   neighbor.stage_order = tempOrder;
   
   const pass = sessionStorage.getItem('gq_editor_pass') || '';
-  await rpcSaveQuest(point, pass);
+  await const id = await rpcSaveQuest(point, pass);
+  if (id == null) { toast('⚠️ Точка не найдена в БД (id=null) — сверь scenario_slug'); return; }
   await rpcSaveQuest(neighbor, pass);
   
   renderStagesEditor();
@@ -1217,7 +1218,7 @@ $('edSavePoint').onclick = async () => {
 
   const pass = sessionStorage.getItem('gq_editor_pass') || '';
   const id = await rpcSaveQuest(point, pass);
-  
+  if (id == null) { toast('⚠️ Точка не найдена в БД (id=null) — сверь scenario_slug'); return; }
   if (id === -1) { sessionStorage.removeItem('gq_editor_pass'); toast('❌ Неверный пароль'); return; }
   if (id === -2) { toast('⚠️ Ошибка связи с БД'); return; }
   
