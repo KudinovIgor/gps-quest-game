@@ -997,7 +997,7 @@ async function movePointInStage(point, stage, direction) {
   neighbor.stage_order = tempOrder;
   
   const pass = sessionStorage.getItem('gq_editor_pass') || '';
-  await const id = await rpcSaveQuest(point, pass);
+  const id = await rpcSaveQuest(point, pass);
   if (id == null) { toast('⚠️ Точка не найдена в БД (id=null) — сверь scenario_slug'); return; }
   await rpcSaveQuest(neighbor, pass);
   
