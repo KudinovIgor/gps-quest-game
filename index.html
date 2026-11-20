@@ -1370,17 +1370,48 @@ function renderDebug(fit){
       mk(q,(si+1)+'.'+(pi+1),'',col);
       chain.push([q.lat,q.lng]);
     });
+    
     prevTail=[pts[pts.length-1].lat,pts[pts.length-1].lng];
   });
 
   // точки без этапа (или с битым stage_id) — серые, в нить не входят
   (S.points||[]).filter(p=>!p.stage_id||!stages.some(s=>s.id===p.stage_id))
     .forEach((q,i)=>mk(q,'?'+(i+1),'orphan','#666'));
+    // === ДОБАВИТЬ: круг радиуса для каждой точки ===
+      const radius = q.radius || CONFIG.arriveRadius;
+      L.circle([q.lat,q.lng],{
+        radius: radius,
+        color: col,
+        weight: 1.5,
+        opacity: 0.6,
+        dashArray: '4 4',
+        fillColor: col,
+        fillOpacity: 0.08,
+        interactive: false
+      }).addTo(debugLayer);
+    });
+    prevTail=[pts[pts.length-1].lat,pts[pts.length-1].lng];
+  });
 
+  (S.points||[]).filter(p=>!p.stage_id||!stages.some(s=>s.id===p.stage_id))
+    .forEach((q,i)=>{
+      mk(q,'?'+(i+1),'orphan','#666');
+      // Круг радиуса для точек без этапа
+      const radius = q.radius || CONFIG.arriveRadius;
+      L.circle([q.lat,q.lng],{
+        radius: radius,
+        color: '#666',
+        weight: 1.5,
+        opacity: 0.6,
+        dashArray: '4 4',
+        fillColor: '#666',
+        fillOpacity: 0.08,
+        interactive: false
+      }).addTo(debugLayer);
+    });
   if(fit&&chain.length) map.fitBounds(L.latLngBounds(chain),{padding:[50,50]});
 }
 
-// Вспомогательная функция (должна быть СРАЗУ ПОСЛЕ renderDebug)
 function mk(q,label,cls,color){
   const m=L.marker([q.lat,q.lng],{
     icon:L.divIcon({className:'',html:'<div class="dbg '+cls+(S.delMode?' del':'')+'" style="border-color:'+color+'">'+label+'</div>',iconSize:[24,24],iconAnchor:[12,12]}),
