@@ -694,65 +694,43 @@ function checkArrival() {
   }
 }
 
-/* ---------- функция группировки заданий ---------- */
-/*function computeStages(){
-  const stages=[];
-  for(const q of S.points){              // уже отсортированы по sort_order
-    const last=stages[stages.length-1];  // «стопка на столе»
-    if(last && last.kind===q.kind){
-      last.qs.push(q);                   // подходит в открытый этап
-    } else {
-      stages.push({kind:q.kind, qs:[q]});// иначе открыть новый этап
-    }
-  }
-  for(let i=0;i<stages.length;i++){      // в JS индексы с нуля!
-    const st=stages[i];
-    st.num=i+1;                          // номер этапа для бейджа Эn
-    if(st.kind==='main')continue;        // цепочкам круг не нужен
-    const lats=st.qs.map(q=>q.lat), lngs=st.qs.map(q=>q.lng);
-    st.centerLat=(Math.min(...lats)+Math.max(...lats))/2;
-    st.centerLng=(Math.min(...lngs)+Math.max(...lngs))/2;
-    st.rM=30;                            // запас метров, растянем ниже
-    for(const q of st.qs){
-      const d=distM(st.centerLat,st.centerLng,q.lat,q.lng);
-      if(d+30>st.rM)st.rM=d+30;          // круг накроет самую дальнюю точку
-    }
-  }
-  return stages;
-}*/
-
-/* ---------- оценка длины маршрута для отладки ---------- */
+/* ---------- оценка длины маршрута для отладки (новая модель этапов) ---------- */
 function routeKm(){
-  const stages=(typeof getStages==='function')?getStages():computeStages();
-  const D=(a,b)=>distM(a.lat,a.lng,b.lat,b.lng);
-  const WALK=1.3;               // коэффициент уличности: прямые линии → реальная ходьба
-  let total=0, prev=null;
-  for(const st of stages){
-    if(st.kind==='story')continue;                 // история не добавляет метров
-    if(st.kind==='main'){
-      for(const q of st.qs){ if(prev)total+=D(prev,q); prev=q; }
+  const stages = (S.stages || []).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const D = (a,b) => distM(a.lat,a.lng,b.lat,b.lng);
+  const WALK = 1.3;            // коэффициент уличности: прямые линии → реальная ходьба
+  let total = 0, prev = null;
+
+  for (const st of stages){
+    const qs = (S.points || [])
+      .filter(p => p.stage_id === st.id)
+      .sort((a,b) => (a.stage_order||0) - (b.stage_order||0));
+    if (!qs.length) continue;
+
+    const type = st.rule_type || st.kind;
+    if (type === 'story') continue;                 // история не добавляет метров
+
+    if (type === 'linear' || type === 'main'){
+      for (const q of qs){ if (prev) total += D(prev,q); prev = q; }
     } else {
-      if(!st.qs.length)continue;
-      let entry=st.qs[0], best=prev?D(prev,entry):0;   // вход в кластер — ближайшая точка
-      if(prev)for(const q of st.qs){const d=D(prev,q);if(d<best){best=d;entry=q;}}
-      if(prev)total+=best;
-      const rest=st.qs.filter(q=>q!==entry);           // жадный обход: ближайшая следующая
-      let cur=entry;
-      while(rest.length){
-        let ni=0,nd=Infinity;
-        rest.forEach((q,i)=>{const d=D(cur,q);if(d<nd){nd=d;ni=i;}});
-        total+=nd;cur=rest.splice(ni,1)[0];
+      // foxhunter / bonus: жадный обход кластера от ближайшей точки к prev
+      let entry = qs[0], best = prev ? D(prev, entry) : 0;
+      if (prev) for (const q of qs){ const d = D(prev,q); if (d < best){ best = d; entry = q; } }
+      if (prev) total += best;
+      const rest = qs.filter(q => q !== entry);
+      let cur = entry;
+      while (rest.length){
+        let ni = 0, nd = Infinity;
+        rest.forEach((q,i)=>{ const d = D(cur,q); if (d < nd){ nd = d; ni = i; } });
+        total += nd; cur = rest.splice(ni,1)[0];
       }
-      prev=cur;
+      prev = cur;
     }
   }
-  return total*WALK/1000;
+  return total * WALK / 1000;
 }
+ 
 
- 
- 
-/* ---------- этапы: гейтинг и презентация ---------- */
-let cachedStages=null;
 // Вспомогательные функции для работы с этапами
 function invalidateStages() {
   if (S.stages && S.stages.length) {
@@ -761,10 +739,7 @@ function invalidateStages() {
     S.stages = [];
   }
 }
-function getStages(){
-  if(!cachedStages) cachedStages=computeStages();
-  return cachedStages;
-}
+
 function currentStage(){
   if(!S.stages||!S.stages.length) return null;
   for(let i=0;i<S.stages.length;i++){
@@ -780,9 +755,17 @@ function currentStage(){
 function foxStageActive(){const st=currentStage();return !!st&&st.kind==='foxhunter';}
 
 function foxStageRange(){
-  const st=currentStage();
-  if(!st||st.kind!=='foxhunter')return CONFIG.foxRange;
-  return Math.max(150,st.rM*2);   // компактный этап = чувствительный эфир
+  const st = currentStage();
+  const type = st && (st.rule_type || st.kind);
+  if (type !== 'foxhunter') return CONFIG.foxRange;
+  const qs = (S.points||[]).filter(p => p.stage_id === st.id);
+  if (qs.length < 2) return CONFIG.foxRange;
+  const lats = qs.map(q=>q.lat), lngs = qs.map(q=>q.lng);
+  const cLa = (Math.min(...lats)+Math.max(...lats))/2;
+  const cLo = (Math.min(...lngs)+Math.max(...lngs))/2;
+  let rM = 30;
+  for (const q of qs){ const d = distM(cLa,cLo,q.lat,q.lng); if (d+30 > rM) rM = d+30; }
+  return Math.max(150, rM*2);
 }
 function showStory(q){S.story=q;$('storyTitle').textContent=q.title||'📜 История';$('storyText').textContent=q.desc||'';$('ovStory').hidden=false;}
 
