@@ -1332,80 +1332,109 @@ function renderDebug(fit){
   if(debugLayer){ map.removeLayer(debugLayer); debugLayer=null; }
   if(!S.debug) return;
   debugLayer=L.layerGroup().addTo(map);
-  const PAL={linear:'#ffc857',main:'#ffc857',bonus:'#6c9bd2',foxhunter:'#c77dff',story:'#8ab4f8',flashlight:'#00e5ff',sequence:'#ff5470'};
-  const stages=(S.stages||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-  const chain=[];           // сквозная нить маршрута
-  let prevTail=null;        // хвост предыдущего этапа
+  
+  const PAL = {
+    linear: '#ffc857',
+    main: '#ffc857',
+    bonus: '#6c9bd2',
+    foxhunter: '#c77dff',
+    story: '#8ab4f8',
+    flashlight: '#00e5ff',
+    sequence: '#ff5470',
+    free: '#3ddc84'
+  };
+  
+  const stages = (S.stages||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const chain = [];
+  let prevTail = null;
 
-  stages.forEach((st,si)=>{
-    const col=PAL[st.rule_type]||PAL[st.kind]||'#8ab4f8';
-    const pts=(S.points||[]).filter(p=>p.stage_id===st.id)
-      .sort((a,b)=>(a.stage_order||0)-(b.stage_order||0));
+  stages.forEach((st, si) => {
+    const type = st.rule_type || st.kind || 'linear';
+    const col = PAL[type] || '#8ab4f8';
+    const pts = (S.points||[])
+      .filter(p => p.stage_id === st.id)
+      .sort((a,b) => (a.stage_order||0) - (b.stage_order||0));
+    
     if(!pts.length) return;
 
-    // связка между этапами: хвост прошлого → голова текущего
+    // Связка между этапами: хвост прошлого → голова текущего
     if(prevTail){
-      L.polyline([prevTail,[pts[0].lat,pts[0].lng]],{color:'#5b7a94',weight:2,opacity:.8,dashArray:'2 7',interactive:false}).addTo(debugLayer);
+      L.polyline([prevTail, [pts[0].lat, pts[0].lng]], {
+        color: '#5b7a94', weight: 2, opacity: .8, dashArray: '2 7', interactive: false
+      }).addTo(debugLayer);
     }
 
-    // внутренняя нить этапа
-    if(pts.length>1){
-      L.polyline(pts.map(p=>[p.lat,p.lng]),{color:col,weight:3,opacity:.9,interactive:false}).addTo(debugLayer);
-    }
-
-    // описывающая окружность + центр + спицы для групповых этапов
-    if(pts.length>1){
-      const cLa=pts.reduce((s,p)=>s+p.lat,0)/pts.length;
-      const cLo=pts.reduce((s,p)=>s+p.lng,0)/pts.length;
-      const rad=Math.max(...pts.map(p=>dbgDist(cLa,cLo,p.lat,p.lng)));
-      L.circle([cLa,cLo],{radius:rad,color:col,weight:1.5,opacity:.7,dashArray:'8 6',fillColor:col,fillOpacity:.05,interactive:false}).addTo(debugLayer);
-      L.marker([cLa,cLo],{icon:L.divIcon({className:'',html:'<div class="dbg stage" style="background:'+col+';color:#0a1420">Э'+(si+1)+'</div>',iconSize:[30,30],iconAnchor:[15,15]}),zIndexOffset:400,interactive:false})
-        .bindTooltip('Э'+(si+1)+': '+st.title+' ('+(st.rule_type||st.kind)+') · точек: '+pts.length,{direction:'top',offset:[0,-14]}).addTo(debugLayer);
-      if(st.rule_type==='foxhunter'||st.rule_type==='bonus'){
-        pts.forEach(p=>L.polyline([[cLa,cLo],[p.lat,p.lng]],{color:col,weight:1.2,opacity:.5,interactive:false}).addTo(debugLayer));
-      }
-    }
-
-    pts.forEach((q,pi)=>{
-      mk(q,(si+1)+'.'+(pi+1),'',col);
-      chain.push([q.lat,q.lng]);
-
-      // точки без этапа (или с битым stage_id) — серые, в нить не входят
-      (S.points||[]).filter(p=>!p.stage_id||!stages.some(s=>s.id===p.stage_id))
-        .forEach((q,i)=>mk(q,'?'+(i+1),'orphan','#666'));
-        // === ДОБАВИТЬ: круг радиуса для каждой точки ===
-          const radius = q.radius || CONFIG.arriveRadius;
-          L.circle([q.lat,q.lng],{
-            radius: radius,
-            color: col,
-            weight: 1.5,
-            opacity: 0.6,
-            dashArray: '4 4',
-            fillColor: col,
-            fillOpacity: 0.08,
-            interactive: false
-          }).addTo(debugLayer);
-        });
-        prevTail=[pts[pts.length-1].lat,pts[pts.length-1].lng];
+    // === ГРУППОВЫЕ ЭТАПЫ (лисы, бонусы, sequence, free) ===
+    // Рисуем окружность вокруг кластера + центр + лучи к точкам
+    if(['foxhunter', 'bonus', 'sequence', 'free'].includes(type)){
+      const cLa = pts.reduce((s,p) => s+p.lat, 0) / pts.length;
+      const cLo = pts.reduce((s,p) => s+p.lng, 0) / pts.length;
+      const rad = Math.max(...pts.map(p => dbgDist(cLa, cLo, p.lat, p.lng)));
+      
+      // Описывающая окружность
+      L.circle([cLa, cLo], {
+        radius: rad,
+        color: col, weight: 1.5, opacity: .7,
+        dashArray: '8 6', fillColor: col, fillOpacity: .05, interactive: false
+      }).addTo(debugLayer);
+      
+      // Маркер центра этапа
+      L.marker([cLa, cLo], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="dbg stage" style="background:'+col+';color:#0a1420">Э'+(si+1)+'</div>',
+          iconSize: [30, 30], iconAnchor: [15, 15]
+        }),
+        zIndexOffset: 400, interactive: false
+      }).bindTooltip('Э'+(si+1)+': '+st.title+' ('+type+') · точек: '+pts.length, {
+        direction: 'top', offset: [0, -14]
+      }).addTo(debugLayer);
+      
+      // Лучи от центра к каждой точке
+      pts.forEach(p => {
+        L.polyline([[cLa, cLo], [p.lat, p.lng]], {
+          color: col, weight: 1.2, opacity: .5, interactive: false
+        }).addTo(debugLayer);
       });
+      
+      // Маркеры точек
+      pts.forEach((q, pi) => {
+        mk(q, (si+1)+'.'+(pi+1), '', col);
+        chain.push([q.lat, q.lng]);
+      });
+    }
+    // === ЛИНЕЙНЫЕ ЭТАПЫ (обычный маршрут) ===
+    // Только линия маршрута, без окружности
+    else {
+      if(pts.length > 1){
+        L.polyline(pts.map(p => [p.lat, p.lng]), {
+          color: col, weight: 3, opacity: .9, interactive: false
+        }).addTo(debugLayer);
+      }
+      
+      pts.forEach((q, pi) => {
+        mk(q, (si+1)+'.'+(pi+1), '', col);
+        chain.push([q.lat, q.lng]);
+      });
+    }
     
-      (S.points||[]).filter(p=>!p.stage_id||!stages.some(s=>s.id===p.stage_id))
-        .forEach((q,i)=>{
-          mk(q,'?'+(i+1),'orphan','#666');
-          // Круг радиуса для точек без этапа
-          const radius = q.radius || CONFIG.arriveRadius;
-          L.circle([q.lat,q.lng],{
-            radius: radius,
-            color: '#666',
-            weight: 1.5,
-            opacity: 0.6,
-            dashArray: '4 4',
-            fillColor: '#666',
-            fillOpacity: 0.08,
-            interactive: false
-          }).addTo(debugLayer);
+    prevTail = [pts[pts.length-1].lat, pts[pts.length-1].lng];
+  });
+
+  // Точки без этапа (orphan) — серые, в нить не входят
+  (S.points||[])
+    .filter(p => !p.stage_id || !stages.some(s => s.id === p.stage_id))
+    .forEach((q, i) => {
+      mk(q, '?'+(i+1), 'orphan', '#666');
+      // Круг радиуса для orphan-точек
+      const radius = q.radius || CONFIG.arriveRadius;
+      L.circle([q.lat, q.lng], {
+        radius: radius, color: '#666', weight: 1.5, opacity: 0.6,
+        dashArray: '4 4', fillColor: '#666', fillOpacity: 0.08, interactive: false
+      }).addTo(debugLayer);
     });
-  if(fit&&chain.length) map.fitBounds(L.latLngBounds(chain),{padding:[50,50]});
+
+  if(fit && chain.length) map.fitBounds(L.latLngBounds(chain), {padding: [50, 50]});
 }
 
 function mk(q,label,cls,color){
