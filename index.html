@@ -872,7 +872,9 @@ function captureFox(q){
   toast('🦊 Лиса «'+q.title+'» поймана! Осталось: '+foxes().filter(x=>!S.opened.has(String(x.id))).length);
   S.foxTarget=null;S.foxD=Infinity;S.foxSig=null;S.foxHist=[];
   renderFoxSel();
-  if(!foxes().some(x=>!S.opened.has(String(x.id))))S.foxDonePending=true;  // поймали ПОСЛЕДНЮЮ лису — запланировать праздник
+  if(!foxes().some(x=>!S.opened.has(String(x.id)))) {
+    S.foxDonePending=true;  // поймали ПОСЛЕДНЮЮ лису — запланировать праздник
+  }
 }
 function renderStagesEditor() {
   const container = $('stagesList');
@@ -1402,6 +1404,8 @@ function renderDebug(fit){
         mk(q, (si+1)+'.'+(pi+1), '', col);
         chain.push([q.lat, q.lng]);
       });
+      // ВАЖНО: запоминаем центр этапа, а не последнюю точку
+      prevTail = [cLa, cLo];
     }
     // === ЛИНЕЙНЫЕ ЭТАПЫ (обычный маршрут) ===
     // Только линия маршрута, без окружности
@@ -2355,6 +2359,12 @@ $('btnCardContinue').onclick = () => {
   if (st && st.rule_type === 'foxhunter') {
     setMode('fox');
     renderFoxSel();
+  }
+
+  // Если все лисы пойманы — показать поздравление
+  if (S.foxDonePending) {
+    S.foxDonePending = false;
+    $('ovFoxDone').hidden = false;
   }
 };
 
