@@ -2293,7 +2293,15 @@ initMap();
 $('btnMap').onclick=()=>setMode('map');
 $('btnRadar').onclick=()=>setMode('radar');
 $('btnFox').onclick=()=>setMode('fox');
-$('btnFoxDoneClose').onclick=()=>{$('ovFoxDone').hidden=true;presentStage();};
+$('btnFoxDoneClose').onclick=() => {
+  $('ovFoxDone').hidden = true;
+  // Сбрасываем режим лис, переходим к следующему этапу
+  S.foxSel = null; S.foxTarget = null; S.foxD = Infinity; S.foxSig = null; S.foxHist = []; stopFoxAudio();
+  // Автоматически переключаемся на карту
+  setMode('map');
+  // Показываем следующий этап
+  presentStage();
+};
 $('btnTest').onclick=()=>{S.testMode=!S.testMode;$('btnTest').classList.toggle('on',S.testMode);toast(S.testMode?'🧪 Тест-режим ВКЛ: клик по карте = твоя позиция':'🧪 Тест-режим выкл');};
  function updateFollowBtn(){
   const b=$('btnFollow');
