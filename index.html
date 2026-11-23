@@ -1417,6 +1417,11 @@ function renderDebug(fit){
       pts.forEach((q, pi) => {
         mk(q, (si+1)+'.'+(pi+1), '', col);
         chain.push([q.lat, q.lng]);
+        // Круг радиуса активации точки
+        const radius = q.radius || CONFIG.arriveRadius;
+        L.circle([q.lat, q.lng], {
+          radius: radius, color: col, weight: 1.5, opacity: 0.5, dashArray: '4 4', fillColor: col, fillOpacity: 0.06, interactive: false
+        }).addTo(debugLayer);
       });
       
       // Хвост для следующего этапа = центр этого (связка придёт сюда)
@@ -1433,6 +1438,11 @@ function renderDebug(fit){
       pts.forEach((q, pi) => {
         mk(q, (si+1)+'.'+(pi+1), '', col);
         chain.push([q.lat, q.lng]);
+        // Круг радиуса активации точки
+        const radius = q.radius || CONFIG.arriveRadius;
+        L.circle([q.lat, q.lng], {
+          radius: radius, color: col, weight: 1.5, opacity: 0.5, dashArray: '4 4', fillColor: col, fillOpacity: 0.06, interactive: false
+        }).addTo(debugLayer);        
       });
       
       // Хвост для следующего этапа = последняя точка линейного
