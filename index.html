@@ -600,7 +600,8 @@ const S = {
   // --- НОВЫЕ ПОЛЯ ДЛЯ УНИВЕРСАЛЬНОЙ КАРТОЧКИ ---
   cardLocked: false,
   cardMode: 'walking', // 'walking' | 'story' | 'question' | 'fact'
-  arrivalPoint: null
+  arrivalPoint: null,
+  questDoneAck: false // «Квест пройден» уже показали и подтвердили
 };
 const LS = 'gq_progress_v1';
 const progKey = () => LS + ':' + S.scenario.slug;
@@ -1922,14 +1923,7 @@ function renderCard() {
     T.textContent = '🎉 Квест пройден!';
     D.textContent = 'Ты открыл все точки маршрута. Нажми «Далее», чтобы увидеть весь путь.';
     BC.hidden = false;
-    BC.onclick = () => {
-      // Показать весь маршрут на карте
-      const allCoords = S.points.filter(q => q.kind !== 'story').map(q => [q.lat, q.lng]);
-      if (allCoords.length > 0) {
-        map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50] });
-      }
-      BC.onclick = null; // отвязать обработчик
-    };
+    if (Dist) Dist.textContent = '';
     return;
   }
 
@@ -2318,7 +2312,7 @@ function normalizeRows(src){
 }
 function applyScenario(meta, quests, stages, note){
   invalidateStages();
-  S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={};
+  S.scenario=meta; S.fact=null; S.phase='main'; S.wrong={}; S.questDoneAck = false;
   clearInterval(S.timerId); S.lockRadar=false;
   $('ovFail').hidden=true; $('ovWin').hidden=true; $('ovFoxDone').hidden=true;
   loadProg();
@@ -2466,6 +2460,7 @@ $('btnReset').onclick=()=>{
   S.foxSel=null;S.shownQid=null;S.foxDonePending=false;
   S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxD=Infinity;
   S.lockRadar=false;
+  S.questDoneAck=false;
   clearInterval(S.timerId);stopFoxAudio();
   if(S.mode==='fox')setMode('map');
   $('ovWin').hidden=true;$('ovFail').hidden=true;$('ovFoxDone').hidden=true;$('ovStory').hidden=true;
@@ -2505,21 +2500,26 @@ $('btnStoryNext').onclick=()=>{
   $('ovStory').hidden=true;
   updateGame();presentStage();
 };
+
 $('btnCardContinue').onclick = () => {
+  // --- Квест пройден: показать весь маршрут ---
+  const allTaken = S.points.length > 0 && S.opened.size >= S.points.length;
+  if (allTaken && !S.cardLocked && !S.questDoneAck && S.phase !== 'won') {
+    S.questDoneAck = true;
+    const allCoords = S.points.map(q => [q.lat, q.lng]);
+    if (allCoords.length) map.fitBounds(L.latLngBounds(allCoords), { padding: [60, 60] });
+    $('card').classList.remove('centered');
+    updateGame();
+    return;
+  }
+  // --- Обычный режим: засчитать точку карточки ---
   const p = S.arrivalPoint || target();
   if (!p) return;
   const st = S.stages.find(s => s.id === p.stage_id);
   collect(p);
-  // Если это была story-точка в этапе лис — запустить охоту
   if (st && st.rule_type === 'foxhunter') {
     setMode('fox');
     renderFoxSel();
-  }
-
-  // Если все лисы пойманы — показать поздравление
-  if (S.foxDonePending) {
-    S.foxDonePending = false;
-    $('ovFoxDone').hidden = false;
   }
 };
 
