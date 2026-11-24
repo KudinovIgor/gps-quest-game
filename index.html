@@ -1915,6 +1915,24 @@ function renderCard() {
   const t = target();
   const p = S.arrivalPoint || t;
 
+  // === КВЕСТ ПРОЙДЕН ===
+  const allPointsTaken = S.points.length > 0 && S.opened.size === S.points.length;
+  if (allPointsTaken && !S.cardLocked && S.phase !== 'won') {
+    $('card').classList.add('centered');
+    T.textContent = '🎉 Квест пройден!';
+    D.textContent = 'Ты открыл все точки маршрута. Нажми «Далее», чтобы увидеть весь путь.';
+    BC.hidden = false;
+    BC.onclick = () => {
+      // Показать весь маршрут на карте
+      const allCoords = S.points.filter(q => q.kind !== 'story').map(q => [q.lat, q.lng]);
+      if (allCoords.length > 0) {
+        map.fitBounds(L.latLngBounds(allCoords), { padding: [50, 50] });
+      }
+      BC.onclick = null; // отвязать обработчик
+    };
+    return;
+  }
+
   // === БОНУС-РЕЙД 
   if (S.phase === 'bonus' && !S.cardLocked) {
     $('card').classList.remove('centered');
