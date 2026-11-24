@@ -424,16 +424,16 @@ header {
 
 <div id="ovBonus" class="overlay" hidden><div class="box">
   <h2>🏆 Все точки открыты!</h2>
-  <p id="ovBonusDesc">Открыт бонус-рейд: <b>скрытые точки</b>, видно только на радаре. Подойди к каждой — соберёшь фрагменты ключа.</p>
-  <button id="btnBonusStart">⏱ Начать рейд</button>
+  <p id="ovBonusDesc">Открыт уровень с радаром: <b>скрытые точки</b>, видно только на радаре. Подойди к каждой — соберёшь фрагменты ключа.</p>
+  <button id="btnBonusStart">⏱ Начать уровень</button>
   <button id="btnBonusLater" class="sec">Позже</button>
 </div></div>
 
 <div id="ovWin" class="overlay" hidden><div class="box">
   <h2>🔑 Ключ собран!</h2>
-  <p>Ты успела по времени. Ты — легенда!</p>
+  <p>Ты успел по времени. Ты — легенда!</p>
   <div class="key" id="winKey"></div>
-  <p>Покажи этот код хранителю квеста.</p>
+  <p>Сохрани этот код</p>
   <button id="btnWinClose">Продолжить</button>
 </div></div>
 
@@ -711,11 +711,12 @@ function checkArrival() {
   if (S.cardLocked) return;
   
   let p = null;
+
   if (S.phase === 'bonus') {
-    p = S.points.find(q => {
+     p = S.points.filter(q => {
       const st = S.stages.find(s => s.id === q.stage_id);
       return st && st.rule_type === 'bonus' && !S.opened.has(String(q.id));
-    });
+    }).find(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius)) || null;
   } else if (S.mode === 'fox' && S.foxId) {
     p = S.points.find(q => String(q.id) === String(S.foxId));
   } else {
@@ -1819,15 +1820,7 @@ function updateGame(){
       mst.textContent += ' · 📏 ' + km.toFixed(1) + ' км' + (km > 10 ? ' ⚠️ много!' : '');
     }
   }
-  if(S.phase==='bonus'&&S.pos&&!S.bonusQuiz&&!S.fact){
-    for(const q of bs.filter(q=>!S.opened.has(String(q.id)))){
-      if(distM(S.pos[0],S.pos[1],q.lat,q.lng)<=q.radius){
-        if(q.answer){ S.bonusQuiz=q; toast('🔎 Бонусная точка найдена! Отвечай на загадку.'); }
-        else captureBonus(q);
-        break;
-      }
-    }
-  }
+
   /* --- охота на лис: сигнал и поимка ТОЛЬКО к выбранной лисе --- */
   const fx=foxStageQuests().filter(q=>!S.opened.has(String(q.id)));
   if(S.mode==='fox'&&S.pos&&fx.length){
@@ -1967,7 +1960,9 @@ function renderCard() {
 
 function collect(p) {
   if (!p || S.opened.has(String(p.id))) return;
-  
+  const before = currentStage();
+  const beforeIdx = before ? before.idx : -1;
+
   S.opened.add(String(p.id));
   saveProg();
   S.wrong[p.id] = 0;
@@ -1978,26 +1973,17 @@ function collect(p) {
   S.arrived = false;
   S.arrivalPoint = null;
   
-  // Если это бонусная точка — добавляем фрагмент
-  const st = S.stages.find(s => s.id === p.stage_id);
-  if (st && st.rule_type === 'bonus' && p.title) {
-    S.fragments.push(p.title.slice(0, 2).toUpperCase());
-  }
-  
-  // Проверяем, все ли бонусы собраны
+  // Рейд завершён?
   if (S.phase === 'bonus') {
-    const bonuses = S.points.filter(q => {
-      const s = S.stages.find(st => st.id === q.stage_id);
-      return s && s.rule_type === 'bonus';
-    });
-    const opened = bonuses.filter(q => S.opened.has(String(q.id))).length;
-    if (opened === bonuses.length && bonuses.length > 0) {
+    const bs = bonuses();
+    if (bs.length && bs.every(b => S.opened.has(String(b.id)))) 
       win();
-    }
   }
-  
-  updateGame();
-  presentStage();
+
+  // Презентуем следующий этап ТОЛЬКО если этап сменился
+  const after = currentStage();
+  if (!after || after.idx !== beforeIdx) presentStage();
+  else updateGame();
 }
 
 function submitAnswer() {
@@ -2019,27 +2005,12 @@ function submitAnswer() {
     }
     return;
   }
-  // --- Ветка: загадка бонуса ---
-  if (S.bonusQuiz) {
-    const bq = S.bonusQuiz;
-    const v = normAns($('answerInput').value); if (!v) return;
-    const ok = String(bq.answer).split('|').some(a => normAns(a) === v);
-    if (ok) {
-      S.bonusQuiz = null;
-      S.wrong[bq.id] = 0; $('answerInput').value = '';
-      S.cardMode = bq.comment && bq.comment.trim() ? 'fact' : 'walking';
-      S.arrivalPoint = bq;
-      if (S.cardMode === 'walking') { collect(bq); } else { renderCard(); }
-      updateGame();
-    } else {
-      S.wrong[bq.id] = (S.wrong[bq.id] || 0) + 1;
-      toast('❌ Неверно! Попытка ' + S.wrong[bq.id]);
-      renderCard();
-    }
-    return;
-  }
+
   // --- Ветка: обычная точка маршрута ---
-  const t = target(); if (!t || !S.atPoint) return;
+  // --- Ветка: точка, зафиксированная карточкой (обычная или бонус) ---
+  const t = (S.cardLocked && S.arrivalPoint) ? S.arrivalPoint : target();
+  if (!t) return;
+  if (!(S.atPoint || S.cardLocked)) return;
   const v = normAns($('answerInput').value); if (!v) return;
   const ok = String(t.answer).split('|').some(a => normAns(a) === v);
   if (ok) {
@@ -2120,6 +2091,7 @@ function startBonus() {
 function win(){
   S.phase='won';
   S.fact=null;
+  S.cardLocked=false; S.cardMode='walking'; S.arrivalPoint=null;
   clearInterval(S.timerId);
   S.lockRadar=false;
   $('winKey').textContent=bonuses().map(q=>q.fragment||q.title).join('-');
@@ -2127,10 +2099,10 @@ function win(){
   updateGame();
 }
 function captureBonus(q){
-  S.opened.add(String(q.id));saveProg();
+  collect(q);   // collect сам сбросит карточку и проверит победу
   toast('🔑 Точка «'+q.title+'» взята! Осталось: '+bonuses().filter(x=>!S.opened.has(String(x.id))).length);
-  if(bonuses().length&&bonuses().every(b=>S.opened.has(String(b.id))))win();
 }
+
 function fail(){clearInterval(S.timerId);$('ovFail').hidden=false;}
 
 /* ---------- радар (canvas) ---------- */
@@ -2374,6 +2346,9 @@ $('btnAdd').onclick = () => {
 $('btnDel').onclick=()=>{if(!S.debug){toast('Сначала включи 🐞 Отладку.');return;}S.delMode=!S.delMode;$('btnDel').classList.toggle('on',S.delMode);renderDebug();toast(S.delMode?'➖ Режим удаления: кликни по точке. Ещё раз — выход.':'➖ Режим удаления выключен.');};
 $('edCancel').onclick = () => {$('ovEdit').hidden = true;S.debug = false; $('btnDebug').classList.remove('on'); $('btnAdd').hidden = true; $('btnDel').hidden = true; $('btnTest').hidden = true; renderDebug(); updateGame()};
 $('btnFailRetry').onclick=startBonus;
+$('btnBonusStart').onclick = startBonus;
+$('btnBonusLater').onclick = () => { $('ovBonus').hidden = true; updateGame(); };
+$('btnBonusGo').onclick = startBonus;  // кнопка в карточке
 $('btnWinClose').onclick=()=>{$('ovWin').hidden=true;S.phase='main';presentStage();};
 $('btnFactNext').onclick=()=>{S.fact=null;updateGame();if(S.foxDonePending){S.foxDonePending=false;$('ovFoxDone').hidden=false;}else presentStage();}; 
 $('btnStoryNext').onclick=()=>{
