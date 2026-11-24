@@ -738,24 +738,19 @@ function checkArrival() {
   const d = distM(S.pos[0], S.pos[1], p.lat, p.lng);
   if (d <= (p.radius || CONFIG.arriveRadius)) {
     const pType = getPointType(p);
-    
-    // === ТОЧКИ БЕЗ ЗАГАДКИ: берём сразу, без карточки ===
-    if (!p.answer || !p.answer.trim()) {
-      if (pType === 'bonus') { collect(p); return; }
-      if (pType === 'fox')   { captureFox(p); return; }
-      // story без ответа — это нормально, пойдёт в карточку с "Далее"
-    }
-    
-    // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
+
+    // auto — берём молча, без карточки
+    if (pType === 'auto') { collect(p); return; }
+
+    // story / question — фиксируем карточку
     S.arrived = true;
     S.arrivalPoint = p;
     S.cardLocked = true;
-    S.cardMode = (pType === 'story') ? 'story' : 'question';
-    
+    S.cardMode = pType;
+
     if (typeof ping === 'function') ping();
-    
     updateGame();
-    
+
     if (S.cardMode === 'question') {
       $('answerInput').value = '';
       setTimeout(() => $('answerInput').focus(), 120);
@@ -1920,7 +1915,7 @@ function renderCard() {
   const t = target();
   const p = S.arrivalPoint || t;
 
-  // === БОНУС-РЕЙД ИДЁТ: карточка показывает статус рейда, а не «доступен» ===
+  // === БОНУС-РЕЙД 
   if (S.phase === 'bonus' && !S.cardLocked) {
     $('card').classList.remove('centered');
     T.textContent = '📡 Бонус-рейд';
@@ -1965,38 +1960,45 @@ function renderCard() {
   
   // === КАРТОЧКА ЗАФИКСИРОВАНА В ЦЕНТРЕ ===
   $('card').classList.add('centered');
-  BX.hidden = false;  // показать крестик
-  
+  BX.hidden = false;
+
   if (!p) {
     T.textContent = '⚙️ Точка не найдена';
     D.textContent = 'Проверь настройки этапа.';
     return;
   }
-  
+
   const img = getPointImage(p);
   if (img) { CI.src = img; CI.hidden = false; CI.onerror = () => CI.hidden = true; }
-  
-  const pType = getPointType(p);
-  
+
   if (S.cardMode === 'story') {
     T.textContent = '📜 ' + p.title;
-    D.textContent = p.desc || p.description || 'Читай историю и нажми «Далее».';
+    D.textContent = p.desc || p.description || 'Читай и нажми «Далее».';
     BC.hidden = false;
   } else if (S.cardMode === 'question') {
-    T.textContent = '🎯 ' + p.title;
-    D.textContent = p.desc || p.description || 'Загадка ждёт ответа.';
-    AR.hidden = false;
-    $('answerInput').disabled = false;
-    $('answerBtn').disabled = false;
-    $('answerInput').placeholder = 'Ответ...';
-    if (S.atPoint) setTimeout(() => $('answerInput').focus(), 120);
+    const hasAns = !!(p.answer && p.answer.trim());
+    if (!hasAns) {
+      // предохранитель: вопроса нет — показываем как историю
+      T.textContent = '📜 ' + p.title;
+      D.textContent = p.desc || p.description || 'Контрольная точка без загадки. Нажми «Далее».';
+      BC.hidden = false;
+    } else {
+      T.textContent = '🎯 ' + p.title;
+      D.textContent = p.desc || p.description || 'Загадка ждёт ответа.';
+      AR.hidden = false;
+      $('answerInput').disabled = false;
+      $('answerBtn').disabled = false;
+      $('answerInput').placeholder = 'Ответ...';
+      if (S.atPoint) setTimeout(() => $('answerInput').focus(), 120);
+    }
   } else if (S.cardMode === 'fact') {
     T.textContent = '✅ ' + p.title;
     D.textContent = p.comment || p.desc || 'Отлично!';
     BC.hidden = false;
   }
-  
+
   if (Dist) { Dist.textContent = ''; }
+}
 }
 
 function collect(p) {
