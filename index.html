@@ -2301,17 +2301,26 @@ function hideConnectStatus(){
 /* ---------- fetch с повторами ---------- */
 async function fetchRetry(url, opts, tries, onAttempt){
   tries = tries || 10;
+  const ATTEMPT_TIMEOUT = 5000;   // максимум 5 секунд на одну попытку
   for (let i = 1; i <= tries; i++) {
     if (onAttempt) onAttempt(i, tries);
+
+    const ctrl = ('AbortController' in window) ? new AbortController() : null;
+    const kill = ctrl ? setTimeout(() => ctrl.abort(), ATTEMPT_TIMEOUT) : null;
+
     try {
-      return await fetch(url, opts);
+      const r = await fetch(url, Object.assign({}, opts, ctrl ? { signal: ctrl.signal } : {}));
+      if (kill) clearTimeout(kill);
+      return r;
     } catch (e) {
+      if (kill) clearTimeout(kill);
       if (i === tries) throw e;
-      // растущая пауза, но не больше 2 секунд: ~17 сек суммарно на 10 попыток
+      // растущая пауза между попытками, не больше 2 секунд
       await new Promise(r => setTimeout(r, Math.min(2000, 500 * i)));
     }
   }
 }
+
 async function loadByCode(code, silent){
   if(normAns(code)==='demo'||normAns(code)==='демо'){
     localStorage.setItem('gq_code',code);
