@@ -843,6 +843,8 @@ function presentStage(){
   const t=st.rule_type||st.kind;
   if(t==='bonus'){ if(typeof updateBonusUI==='function')updateBonusUI(); const ov=$('ovBonus'); if(ov)ov.hidden=false; return; }
   if(t==='foxhunter'){ setMode('fox'); return; }
+    // linear / story / sequence / flashlight — все ведут к точке на КАРТЕ
+  if (S.mode !== 'map' && !S.lockRadar) setMode('map');
   updateGame(); // linear / story / sequence / flashlight — все ведут к точке
 }
 
@@ -2492,7 +2494,13 @@ $('btnFailRetry').onclick=startBonus;
 $('btnBonusStart').onclick = startBonus;
 $('btnBonusLater').onclick = () => { $('ovBonus').hidden = true; updateGame(); };
 $('btnBonusGo').onclick = startBonus;  // кнопка в карточке
-$('btnWinClose').onclick=()=>{$('ovWin').hidden=true;S.phase='main';presentStage();};
+$('btnWinClose').onclick=()=>{
+  $('ovWin').hidden=true;
+  S.phase='main';
+  S.lockRadar=false;      // на всякий случай снимаем замок рейда
+  setMode('map');         // возвращаем игрока на карту после рейда
+  presentStage();
+};
 $('btnFactNext').onclick=()=>{S.fact=null;updateGame();if(S.foxDonePending){S.foxDonePending=false;$('ovFoxDone').hidden=false;}else presentStage();}; 
 $('btnStoryNext').onclick=()=>{
   const q=S.story;if(!q)return;
