@@ -878,16 +878,8 @@ function renderFoxSel(){
   $('foxSelHint').textContent=S.foxSel?('Охотимся на лису №'+selIdx+' — сигнал ведёт к ней'):'Выбери лису для охоты:';
 }
 function captureFox(q){
-  S.opened.add(String(q.id));saveProg();
-  if(S.foxSel&&String(S.foxSel.id)===String(q.id))S.foxSel=null;
-  S.wrong[q.id]=0;
-  foxContinuous(false);
-  toast('🦊 Лиса «'+q.title+'» поймана! Осталось: '+foxes().filter(x=>!S.opened.has(String(x.id))).length);
-  S.foxTarget=null;S.foxD=Infinity;S.foxSig=null;S.foxHist=[];
-  renderFoxSel();
-  if(!foxes().some(x=>!S.opened.has(String(x.id)))) {
-    S.foxDonePending=true;  // поймали ПОСЛЕДНЮЮ лису — запланировать праздник
-  }
+  collect(q);   // collect сам: opened, сброс карточки, лисьи дела, окно «все пойманы»
+  toast('🦊 Лиса «'+q.title+'» поймана! Осталось: '+foxStageQuests().filter(x=>!S.opened.has(String(x.id))).length);
 }
 function renderStagesEditor() {
   const container = $('stagesList');
@@ -1730,8 +1722,16 @@ function foxTick(){
   if(!S.foxTarget||!S.pos){foxContinuous(false);renderFox();return;}
   const q=S.foxTarget,d=S.foxD;
   const R=foxStageRange();
-  const t=Math.min(1,d/R);                          // процент считаем ДО ТОЧКИ, а не до круга
-  const raw=5+95*Math.pow(1-t,1.6)+(Math.random()*4-2);
+  let raw;
+  if (d <= q.radius) {
+    // внутри круга ловли: 97..100% — явный сигнал «берём!»
+    raw = 97 + 3 * (1 - d / q.radius);
+  } else {
+    // снаружи: плавно от 5% до 97% по мере подхода к кругу
+    const t = Math.min(1, (d - q.radius) / Math.max(1, R - q.radius));
+    raw = 5 + 92 * Math.pow(1 - t, 1.6);
+  }
+  raw += (Math.random() * 4 - 2);
   S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;
   S.foxHist.push({t:Date.now(),s:S.foxSig});
   while(S.foxHist.length&&Date.now()-S.foxHist[0].t>4000)S.foxHist.shift();
@@ -1839,9 +1839,17 @@ function updateGame(){
     if(best){
       const bd=distM(S.pos[0],S.pos[1],best.lat,best.lng);
       S.foxTarget=best;S.foxD=bd;
-      if(bd<=best.radius&&!S.foxQuiz&&!S.fact){
-      if(!best.answer){ captureFox(best); if(S.foxDonePending){S.foxDonePending=false;$('ovFoxDone').hidden=false;} else presentStage(); }
-        else { S.foxQuiz=best;foxContinuous(false); toast('🦊 Лиса «'+best.title+'» в ловушке! Отвечай на загадку.'); }
+      if(bd<=best.radius&&!S.foxQuiz&&!S.fact&&!S.cardLocked){
+        if(!best.answer){
+          captureFox(best);   // без загадки: сразу ловим (внутри — collect)
+        } else {
+          S.foxQuiz=best;
+          S.cardLocked=true;          // ← фиксируем карточку
+          S.cardMode='question';      // ← режим загадки
+          S.arrivalPoint=best;        // ← карточка привязана к лисе
+          foxContinuous(false);
+          toast('🦊 Лиса «'+best.title+'» в ловушке! Отвечай на загадку.');
+        }
       }
     } else { S.foxTarget=null;S.foxD=Infinity; }
   } else if(S.mode==='fox'){ S.foxTarget=null;S.foxD=Infinity; }
@@ -1983,12 +1991,29 @@ function collect(p) {
   S.cardMode = 'walking';
   S.arrived = false;
   S.arrivalPoint = null;
+
+  // Лисьи дела: снять выбор, очистить эфир, заметить последнюю лису
+  if (getPointType(p) === 'fox') {
+    if (S.foxSel && String(S.foxSel.id) === String(p.id)) S.foxSel = null;
+    S.foxTarget=null; S.foxD=Infinity; S.foxSig=null; S.foxHist=[];
+    foxContinuous(false);
+    renderFoxSel();
+    if (!foxStageQuests().some(x => !S.opened.has(String(x.id)))) S.foxDonePending = true;
+  }
   
   // Рейд завершён?
   if (S.phase === 'bonus') {
     const bs = bonuses();
     if (bs.length && bs.every(b => S.opened.has(String(b.id)))) 
       win();
+  }
+
+  // Поймали последнюю лису — сначала праздник, потом следующий этап
+  if (S.foxDonePending) {
+    S.foxDonePending = false;
+    $('ovFoxDone').hidden = false;
+    updateGame();
+    return;
   }
 
   // Презентуем следующий этап ТОЛЬКО если этап сменился
@@ -2462,6 +2487,7 @@ $('btnCardClose').onclick = () => {
   S.cardMode = 'walking';
   S.arrived = false;
   S.arrivalPoint = null;
+  S.foxQuiz = null;
   $('card').classList.remove('centered');
   updateGame();
 };
