@@ -718,18 +718,17 @@ function refreshMarkers(){
 
 function checkArrival() {
   if (!S.pos) return;
-  // Если карточка уже зафиксирована в центре — игнорируем повторные срабатывания
   if (S.cardLocked) return;
   
   let p = null;
 
   if (S.phase === 'bonus') {
-     p = S.points.filter(q => {
+    p = S.points.filter(q => {
       const st = S.stages.find(s => s.id === q.stage_id);
       return st && st.rule_type === 'bonus' && !S.opened.has(String(q.id));
     }).find(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius)) || null;
-  } else if (S.mode === 'fox' && S.foxId) {
-    p = S.points.find(q => String(q.id) === String(S.foxId));
+  } else if (S.mode === 'fox' && S.foxSel) {
+    p = S.foxSel;
   } else {
     p = target();
   }
@@ -738,18 +737,24 @@ function checkArrival() {
   
   const d = distM(S.pos[0], S.pos[1], p.lat, p.lng);
   if (d <= (p.radius || CONFIG.arriveRadius)) {
+    const pType = getPointType(p);
+    
+    // === ТОЧКИ БЕЗ ЗАГАДКИ: берём сразу, без карточки ===
+    if (!p.answer || !p.answer.trim()) {
+      if (pType === 'bonus') { collect(p); return; }
+      if (pType === 'fox')   { captureFox(p); return; }
+      // story без ответа — это нормально, пойдёт в карточку с "Далее"
+    }
+    
+    // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
     S.arrived = true;
     S.arrivalPoint = p;
-    S.cardLocked = true; // ЗАФИКСИРОВАТЬ КАРТОЧКУ
-    
-    const pType = getPointType(p);
+    S.cardLocked = true;
     S.cardMode = (pType === 'story') ? 'story' : 'question';
     
-    ping(); // Звуковой сигнал
+    if (typeof ping === 'function') ping();
     
-    // Обновляем UI
-    if (typeof refresh === 'function') refresh();
-    else updateGame();
+    updateGame();
     
     if (S.cardMode === 'question') {
       $('answerInput').value = '';
@@ -1722,22 +1727,24 @@ function foxTick(){
   if(!S.foxTarget||!S.pos){foxContinuous(false);renderFox();return;}
   const q=S.foxTarget,d=S.foxD;
   const R=foxStageRange();
-  let raw;
+  let t, raw;
   if (d <= q.radius) {
+    t = 0;
     // внутри круга ловли: 97..100% — явный сигнал «берём!»
     raw = 97 + 3 * (1 - d / q.radius);
   } else {
     // снаружи: плавно от 5% до 97% по мере подхода к кругу
-    const t = Math.min(1, (d - q.radius) / Math.max(1, R - q.radius));
+    t = Math.min(1, (d - q.radius) / Math.max(1, R - q.radius));
     raw = 5 + 92 * Math.pow(1 - t, 1.6);
   }
   raw += (Math.random() * 4 - 2);
   S.foxSig=(S.foxSig==null)?raw:S.foxSig*0.7+raw*0.3;
   S.foxHist.push({t:Date.now(),s:S.foxSig});
-  while(S.foxHist.length&&Date.now()-S.foxHist[0].t>4000)S.foxHist.shift();
+  while(S.foxHist.length&&Date.now()-S.foxHist[0].t>4000)
+    S.foxHist.shift();
   renderFox();                                      // проценты бегают всегда, пока есть цель
   if(!audioCtx)return;
-  if(S.foxQuiz||S.fact){                            // загадка/факт открыты: прибор шепчет
+  if(S.foxQuiz||S.fact||S.cardLocked){    // загадка/факт открыты: прибор шепчет
     foxContinuous(false);
     const now=performance.now();
     if(now-lastBeepAt>=1200){lastBeepAt=now;beep(660,0.06,0.05);}   // приглушённый тик
@@ -1886,8 +1893,10 @@ function renderRadarList(){
   if(S.fact){ul.innerHTML='<li>✅ Точка открыта — читай факт в окне.</li>';return;}
   if(S.phase==='bonus'){
     const got=[...S.opened].map(id=>bonuses().find(q=>String(q.id)===String(id))).filter(Boolean);
-    ul.innerHTML='<li><span>🔑 Осталось точек: '+(bonuses().length-got.length)+'</span><b>эфир рейда</b></li>'
-      +got.map(q=>'<li><span>✅ '+q.title+'</span><b>взята</b></li>').join('');
+    let html='<li><span>🔑 Осталось точек: '+(bonuses().length-got.length)+'</span><b>эфир рейда</b></li>';
+    html+=S.blips.slice(0,6).map(b=>'<li><span>📡 '+b.t+'</span><b>'+fmtDist(b.d)+' · '+dirName(b.b)+'</b></li>').join('');
+    html+=got.map(q=>'<li><span>✅ '+q.title+'</span><b>взята</b></li>').join('');
+    ul.innerHTML=html;
     return;
   }
   if(!S.pos){ul.innerHTML='<li>🛰 Ждём координаты... (дома включи 🧪 и кликни по карте)</li>';return;}
@@ -1902,6 +1911,7 @@ function renderCard() {
   const T = $('cardTitle'), D = $('cardDesc'), Dist = $('cardDist');
   const AR = $('answerRow'), HL = $('hintLine'), BG = $('btnBonusGo');
   const CI = $('cardImage'), BC = $('btnCardContinue'), BX = $('btnCardClose');
+  const BI0 = $('bonusInfo'); if (BI0) BI0.hidden = true;
   
   // Скрыть всё по умолчанию
   AR.hidden = true; HL.hidden = true; BG.hidden = true;
@@ -1909,6 +1919,18 @@ function renderCard() {
   
   const t = target();
   const p = S.arrivalPoint || t;
+
+  // === БОНУС-РЕЙД ИДЁТ: карточка показывает статус рейда, а не «доступен» ===
+  if (S.phase === 'bonus' && !S.cardLocked) {
+    $('card').classList.remove('centered');
+    T.textContent = '📡 Бонус-рейд';
+    D.textContent = 'Только радар: подходи к скрытым точкам. Таймер идёт.';
+    BG.hidden = true;
+    const BI = $('bonusInfo');
+    if (BI) { BI.hidden = false; renderFrags(); }
+    if (Dist) Dist.textContent = '';
+    return;
+  }
   
   // === РЕЖИМ WALKING (идём к точке) ===
   if (!S.cardLocked && !S.atPoint) {
