@@ -720,14 +720,19 @@ function refreshMarkers(){
 function checkArrival() {
   if (!S.pos) return;
   if (S.cardLocked) return;
+  if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
   
   let p = null;
 
   if (S.phase === 'bonus') {
-    p = S.points.filter(q => {
+    // Ищем ВСЕ бонусные точки в радиусе, берём ближайшую неоткрытую
+    const inRange = S.points.filter(q => {
       const st = S.stages.find(s => s.id === q.stage_id);
       return st && st.rule_type === 'bonus' && !S.opened.has(String(q.id));
-    }).find(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius)) || null;
+    }).filter(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius))
+      .sort((a, b) => distM(S.pos[0], S.pos[1], a.lat, a.lng) - distM(S.pos[0], S.pos[1], b.lat, b.lng));
+    
+    p = inRange[0] || null;
   } else if (S.mode === 'fox' && S.foxSel) {
     p = S.foxSel;
   } else {
@@ -2008,9 +2013,8 @@ function renderCard() {
   } else if (S.cardMode === 'question') {
     const hasAns = !!(p.answer && p.answer.trim());
     if (!hasAns) {
-      // предохранитель: вопроса нет — показываем как историю
-      T.textContent = '📜 ' + p.title;
-      D.textContent = p.desc || p.description || 'Контрольная точка без загадки. Нажми «Далее».';
+      T.textContent = '📍 ' + p.title;
+      D.innerHTML = 'Точка <b>' + p.title + '</b> найдена. Нажми «Далее».';
       BC.hidden = false;
     } else {
       T.textContent = '🎯 ' + p.title;
@@ -2562,6 +2566,7 @@ $('btnCardClose').onclick = () => {
   S.arrived = false;
   S.arrivalPoint = null;
   S.foxQuiz = null;
+  S.cardCooldownUntil = Date.now() + 3000;  // ← ДОБАВИТЬ
   $('card').classList.remove('centered');
   updateGame();
 };
