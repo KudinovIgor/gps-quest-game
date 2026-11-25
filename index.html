@@ -719,8 +719,22 @@ function refreshMarkers(){
 
 function checkArrival() {
   if (!S.pos) return;
-  if (S.cardLocked) return;
   if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
+  
+  // === УМНАЯ ПРОВЕРКА ЗАМКА ===
+  if (S.cardLocked && S.arrivalPoint) {
+    const d = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
+    if (d > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
+      // Игрок ушёл из радиуса зафиксированной точки → сбрасываем замок, чтобы найти новую
+      S.cardLocked = false;
+      S.cardMode = 'walking';
+      S.arrived = false;
+      S.arrivalPoint = null;
+    } else {
+      // Игрок всё ещё стоит у зафиксированной точки → ничего не делаем, ждём его действия
+      return;
+    }
+  }
   
   let p = null;
 
@@ -745,18 +759,21 @@ function checkArrival() {
   if (d <= (p.radius || CONFIG.arriveRadius)) {
     const pType = getPointType(p);
 
-    // auto — берём молча, без карточки
-    if (pType === 'auto') { collect(p); return; }
+    // === ТОЧКИ БЕЗ ЗАГАДКИ: решаем по текущему режиму ===
+    if (!p.answer || !p.answer.trim()) {
+      if (S.phase === 'bonus') { collect(p); return; }
+      if (S.mode === 'fox')    { captureFox(p); return; }
+    }
 
-    // story / question — фиксируем карточку
+    // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
     S.arrived = true;
     S.arrivalPoint = p;
     S.cardLocked = true;
-    S.cardMode = pType;
-
+    S.cardMode = (pType === 'story') ? 'story' : 'question';
+    
     if (typeof ping === 'function') ping();
     updateGame();
-
+    
     if (S.cardMode === 'question') {
       $('answerInput').value = '';
       setTimeout(() => $('answerInput').focus(), 120);
