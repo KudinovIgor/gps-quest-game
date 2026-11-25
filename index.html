@@ -717,66 +717,6 @@ function refreshMarkers(){
   } else dirMark.setOpacity(0);
 }
 
-function checkArrival() {
-  if (!S.pos) return;
-  if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
-  if (S.cardLocked && S.arrivalPoint) {
-    const d0 = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
-    if (d0 > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
-      S.cardLocked = false; S.cardMode = 'walking'; S.arrived = false; S.arrivalPoint = null;
-    } else return;
-  }
-
-  let p = null;
-
-  if (S.phase === 'bonus') {
-    const inRange = S.points.filter(q => {
-      const st = S.stages.find(s => s.id === q.stage_id);
-      return st && st.rule_type === 'bonus' && !S.opened.has(String(q.id));
-    }).filter(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius))
-      .sort((a, b) => distM(S.pos[0], S.pos[1], a.lat, a.lng) - distM(S.pos[0], S.pos[1], b.lat, b.lng));
-    p = inRange[0] || null;
-
-    // ===== ДИАГНОСТИКА =====
-    console.log('[bonus-check] pos=', S.pos.map(x=>x.toFixed(5)),
-      'inRange=', inRange.map(q => q.title + '@' + Math.round(distM(S.pos[0],S.pos[1],q.lat,q.lng)) + 'm/r' + (q.radius||40)));
-    // =======================
-  } else if (S.mode === 'fox' && S.foxSel) {
-    p = S.foxSel;
-  } else {
-    p = target();
-  }
-
-  if (!p || S.opened.has(String(p.id))) return;
-
-  const d = distM(S.pos[0], S.pos[1], p.lat, p.lng);
-  if (d <= (p.radius || CONFIG.arriveRadius)) {
-    const pType = getPointType(p);
-    // ===== ДИАГНОСТИКА =====
-    console.log('[bonus-hit] p=', p.title, 'd=', Math.round(d),
-      'radius=', (p.radius||40), 'answer=[' + p.answer + ']', 'pType=', pType);
-    // =======================
-    if (!p.answer || !p.answer.trim()) {
-      if (S.phase === 'bonus') { collect(p); return; }
-      if (S.mode === 'fox')    { captureFox(p); return; }
-    }
-  
-    // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
-    S.arrived = true;
-    S.arrivalPoint = p;
-    S.cardLocked = true;
-    S.cardMode = (pType === 'story') ? 'story' : 'question';
-    
-    if (typeof ping === 'function') ping();
-    updateGame();
-    
-    if (S.cardMode === 'question') {
-      $('answerInput').value = '';
-      setTimeout(() => $('answerInput').focus(), 120);
-    }
-  }
-}
-
 /* ---------- оценка длины маршрута для отладки (новая модель этапов) ---------- */
 function routeKm(){
   const stages = (S.stages || []).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
@@ -1795,33 +1735,55 @@ function foxTick(){
 
 function checkArrival() {
   if (!S.pos) return;
-  if (S.cardLocked) return; // Уже зафиксирована, игнорируем повторные срабатывания
-  
+  if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
+  if (S.cardLocked && S.arrivalPoint) {
+    const d0 = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
+    if (d0 > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
+      S.cardLocked = false; S.cardMode = 'walking'; S.arrived = false; S.arrivalPoint = null;
+    } else return;
+  }
+
   let p = null;
+
   if (S.phase === 'bonus') {
-    p = S.points.find(q => {
+    const inRange = S.points.filter(q => {
       const st = S.stages.find(s => s.id === q.stage_id);
       return st && st.rule_type === 'bonus' && !S.opened.has(String(q.id));
-    });
-  } else if (S.mode === 'fox' && S.foxId) {
-    p = S.points.find(q => String(q.id) === String(S.foxId));
+    }).filter(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius))
+      .sort((a, b) => distM(S.pos[0], S.pos[1], a.lat, a.lng) - distM(S.pos[0], S.pos[1], b.lat, b.lng));
+    p = inRange[0] || null;
+
+    // ===== ДИАГНОСТИКА =====
+    console.log('[bonus-check] pos=', S.pos.map(x=>x.toFixed(5)),
+      'inRange=', inRange.map(q => q.title + '@' + Math.round(distM(S.pos[0],S.pos[1],q.lat,q.lng)) + 'm/r' + (q.radius||40)));
+    // =======================
+  } else if (S.mode === 'fox' && S.foxSel) {
+    p = S.foxSel;
   } else {
     p = target();
   }
-  
+
   if (!p || S.opened.has(String(p.id))) return;
-  
+
   const d = distM(S.pos[0], S.pos[1], p.lat, p.lng);
   if (d <= (p.radius || CONFIG.arriveRadius)) {
+    const pType = getPointType(p);
+    // ===== ДИАГНОСТИКА =====
+    console.log('[bonus-hit] p=', p.title, 'd=', Math.round(d),
+      'radius=', (p.radius||40), 'answer=[' + p.answer + ']', 'pType=', pType);
+    // =======================
+    if (!p.answer || !p.answer.trim()) {
+      if (S.phase === 'bonus') { collect(p); return; }
+      if (S.mode === 'fox')    { captureFox(p); return; }
+    }
+  
+    // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
     S.arrived = true;
     S.arrivalPoint = p;
-    S.cardLocked = true; // ЗАФИКСИРОВАТЬ КАРТОЧКУ
-    
-    const pType = getPointType(p);
+    S.cardLocked = true;
     S.cardMode = (pType === 'story') ? 'story' : 'question';
     
     if (typeof ping === 'function') ping();
-    
     updateGame();
     
     if (S.cardMode === 'question') {
