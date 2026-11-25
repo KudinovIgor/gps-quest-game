@@ -904,9 +904,11 @@ function renderStagesEditor() {
     const pointsList = document.createElement('div');
     pointsList.className = 'stage-points';
     
-    const stagePoints = (S.points || [])
-      .filter(p => p.stage_id === stage.id)
-      .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
+    const stagePoints = (stage.id != null)
+      ? (S.points || [])
+          .filter(p => p.stage_id != null && String(p.stage_id) === String(stage.id))
+          .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0))
+      : [];
     
     stagePoints.forEach((p, pIdx) => {
       const pointRow = document.createElement('div');
