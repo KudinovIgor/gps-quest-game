@@ -827,6 +827,12 @@ function bonusStageActive(){
   return !!st && (st.rule_type || st.kind) === 'bonus';
 }
 
+function currentBonusStage(){
+  const st = currentStage();
+  if (st && (st.rule_type || st.kind) === 'bonus') return st;
+  return (S.stages || []).find(s => (s.rule_type || s.kind) === 'bonus') || null;
+}
+
 function foxStageRange(){
   const st = currentStage();
   const type = st && (st.rule_type || st.kind);
@@ -847,7 +853,12 @@ function presentStage(){
   if(!st){ updateGame(); return; }
   const t=st.rule_type||st.kind;
   if(t==='bonus'){ if(typeof updateBonusUI==='function')updateBonusUI(); const ov=$('ovBonus'); if(ov)ov.hidden=false; return; }
-  if(t==='foxhunter'){ setMode('fox'); return; }
+  if(t==='foxhunter'){
+    // каждый лисий этап начинаем с чистого эфира
+    S.foxSel=null; S.foxSig=null; S.foxHist=[]; S.foxTarget=null; S.foxD=Infinity;
+    setMode('fox');
+    return;
+  }
     // linear / story / sequence / flashlight — все ведут к точке на КАРТЕ
   if (S.mode !== 'map' && !S.lockRadar) setMode('map');
   updateGame(); // linear / story / sequence / flashlight — все ведут к точке
@@ -2140,6 +2151,9 @@ function updateBonusUI() {
   
   const timer = $('bonusTimer');
   if (timer) timer.textContent = timeStr;
+
+  const btnRetry = $('btnFailRetry');
+  if (btnRetry) btnRetry.textContent = '🔄 Повторить рейд (' + timeStr + ')';  
 }
   
 function startBonus() {
@@ -2150,7 +2164,7 @@ function startBonus() {
   setMode('radar');
   
   // Берём время из настроек этапа бонуса
-  const bonusStage = S.stages?.find(s => s.rule_type === 'bonus' || s.kind === 'bonus');
+  const bonusStage = currentBonusStage();
   const timeLimit = bonusStage?.settings?.global_timer || CONFIG.bonusSeconds;
   
   S.bonusEndsAt = Date.now() + timeLimit * 1000;
@@ -2171,6 +2185,7 @@ function win(){
   S.fact=null;
   S.cardLocked=false; S.cardMode='walking'; S.arrivalPoint=null;
   clearInterval(S.timerId);
+  stopFoxAudio();
   S.lockRadar=false;
   $('winKey').textContent=bonuses().map(q=>q.fragment||q.title).join('-');
   $('ovWin').hidden=false;
@@ -2181,7 +2196,7 @@ function captureBonus(q){
   toast('🔑 Точка «'+q.title+'» взята! Осталось: '+bonuses().filter(x=>!S.opened.has(String(x.id))).length);
 }
 
-function fail(){clearInterval(S.timerId);$('ovFail').hidden=false;}
+function fail(){ clearInterval(S.timerId); stopFoxAudio(); updateBonusUI(); $('ovFail').hidden=false; }
 
 /* ---------- радар (canvas) ---------- */
 const cv=$('radar');
@@ -2227,7 +2242,7 @@ function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(
 function setMode(m){
   // Лисий этап: нельзя выйти, пока не пойманы все лисы (кроме 🐞)
   if(foxStageActive()&&!S.debug&&m!=='fox'){toast('🦊 Идёт лисий этап: нельзя выйти, пока не пойманы все лисы. (Кроме 🐞)');return;}
-  if(m==='fox'&&!foxStageActive()&&!(S.debug&&foxes().some(q=>!S.opened.has(String(q.id))))){toast('🦊 Лисий этап ещё не начался.');return;}
+  if(m==='fox'&&!foxStageActive()){toast('🦊 Лисий этап ещё не начался.');return;}
   //  Оставил блокировку радара на всякий случай
   if(S.lockRadar&&m!=='radar'&&!S.debug){toast('🔒 Во время бонус-рейда доступен только радар. (Кроме 🐞)');return;}
   // Радар: только во время бонус-рейда; в 🐞 — когда текущий этап бонусный
