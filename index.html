@@ -279,7 +279,7 @@ header {
   box-shadow: 0 0 10px rgba(0,255,102,.35);
 }
 .foxBtn.done {
-  background: #22303c; border-color: #33506a; color: #5b7d99; cursor: not-allowed;
+  background: #22303c; border-color: #33506a; color: #5b7d99; cursor: not-allowed; width:44px; height:44px
 }
 .done {
   width: 22px; height: 22px; border-radius: 50%; background: var(--gr);
@@ -1772,9 +1772,9 @@ function checkArrival() {
     console.log('[bonus-hit] p=', p.title, 'd=', Math.round(d),
       'radius=', (p.radius||40), 'answer=[' + p.answer + ']', 'pType=', pType);
     // =======================
-    if (!p.answer || !p.answer.trim()) {
-      if (S.mode === 'fox')    { captureFox(p); return; }
-    }
+    //if (!p.answer || !p.answer.trim()) {
+//      if (S.mode === 'fox')    { captureFox(p); return; }
+    //}
   
     // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
     S.arrived = true;
