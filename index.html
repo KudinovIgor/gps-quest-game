@@ -1773,7 +1773,6 @@ function checkArrival() {
       'radius=', (p.radius||40), 'answer=[' + p.answer + ']', 'pType=', pType);
     // =======================
     if (!p.answer || !p.answer.trim()) {
-      if (S.phase === 'bonus') { collect(p); return; }
       if (S.mode === 'fox')    { captureFox(p); return; }
     }
   
@@ -2140,10 +2139,19 @@ function startBonus() {
   S.fact = null;
   S.bonusQuiz = null;
   S.lockRadar = true;
+
+  // === СБРОС БОНУСНЫХ ТОЧЕК ===
+  const bonusStage = currentBonusStage();
+  if (bonusStage) {
+    S.points.filter(p => p.stage_id === bonusStage.id).forEach(p => {
+      S.opened.delete(String(p.id));
+    });
+    saveProg();
+  }
+
   setMode('radar');
   
   // Берём время из настроек этапа бонуса
-  const bonusStage = currentBonusStage();
   const timeLimit = bonusStage?.settings?.global_timer || CONFIG.bonusSeconds;
   
   S.bonusEndsAt = Date.now() + timeLimit * 1000;
@@ -2157,7 +2165,7 @@ function startBonus() {
   
   const minutes = Math.floor(timeLimit / 60);
   const secs = timeLimit % 60;
-  toast(`⏱ Рейд начался! У тебя ${minutes} мин ${secs > 0 ? secs + ' сек' : ''}.`);
+  toast(`⏱ Поиск точек по радару начался! У тебя ${minutes} мин ${secs > 0 ? secs + ' сек' : ''}.`);
 }
 function win(){
   S.phase='won';
