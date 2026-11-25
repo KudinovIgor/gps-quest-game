@@ -60,7 +60,7 @@ header {
 #ovPointEdit .ed::-webkit-scrollbar-thumb { background: #1d4a63; border-radius: 3px; }
 
 /* ===== Окно "Этапы квеста" ===== */
-.stages-box {  max-width: 760px; width: 94vw; max-height: 92vh; padding: 0;  display: flex; flex-direction: column; text-align: initial;  overflow: hidden; background: linear-gradient(170deg, #0d1626, #0a1a2c)}
+.stages-box {  max-width: 90vw; width: 90%; max-height: 92vh; padding: 20px;  display: flex; flex-direction: column; text-align: initial;  overflow: hidden; background: linear-gradient(170deg, #0d1626, #0a1a2c)}
 .stages-box h2 {  margin: 0; padding: 14px 16px; text-align: center; color: var(--cy);  font-size: 18px; border-bottom: 1px solid #16324a; flex: 0 0 auto}
 .stages-scroll {  flex: 1; overflow-y: auto; padding: 10px 14px;  scrollbar-gutter: stable; -webkit-overflow-scrolling: touch;}
 .stages-box > button {  flex: 0 0 auto; width: calc(100% - 28px); margin: 0 14px 10px;  border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700;  cursor: pointer; border: 0}
@@ -1190,7 +1190,7 @@ $('stDelete').onclick = async () => {
   }
 };
 
-// 4. Обновлённое открытие окна точки (теперь с выбором этапа!)
+// Обновлённое открытие окна точки (теперь с выбором этапа!)
 function openPointEditor(point, stageId) {
   S.editingPoint = point;
   
@@ -1230,7 +1230,7 @@ function openPointEditor(point, stageId) {
   $('ovPointEdit').hidden = false;
 }
 
-// 5. Сохранение точки (учитывает новый stage_id из выпадающего списка)
+// Сохранение точки (учитывает новый stage_id из выпадающего списка)
 $('edSavePoint').onclick = async () => {
   const point = S.editingPoint || { id: null, stage_order: 999 };
   
@@ -1265,6 +1265,31 @@ $('edSavePoint').onclick = async () => {
   renderDebug();
   updateGame();
   toast('💾 Точка сохранена в БД');
+};
+
+// Удаление точки
+$('edDeletePoint').onclick = async () => {
+  const p = S.editingPoint;
+  if (!p || p.id == null) { toast('⚠️ Точка ещё не сохранена в БД'); return; }
+  if (!confirm('Удалить точку «' + p.title + '» из базы?')) return;
+  
+  const pass = sessionStorage.getItem('gq_editor_pass') || '';
+  const ok = await rpcDeleteQuest(p.id, pass);
+  
+  if (!ok) {
+    sessionStorage.removeItem('gq_editor_pass');
+    toast('❌ Неверный пароль или точка не найдена');
+    return;
+  }
+  
+  S.points = S.points.filter(x => String(x.id) !== String(p.id));
+  S.opened.delete(String(p.id));
+  $('ovPointEdit').hidden = true;
+  S.editingPoint = null;
+  renderStagesEditor();
+  renderDebug();
+  updateGame();
+  toast('🗑 Точка удалена из БД');
 };
 
 $('edCancelPoint').onclick = () => { $('ovPointEdit').hidden = true; };
