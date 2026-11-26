@@ -2573,7 +2573,9 @@ $('btnAdd').onclick = () => {
   openPointEditor(null, null);
 };
 $('btnDel').onclick=()=>{if(!S.debug){toast('Сначала включи 🐞 Отладку.');return;}S.delMode=!S.delMode;$('btnDel').classList.toggle('on',S.delMode);renderDebug();toast(S.delMode?'➖ Режим удаления: кликни по точке. Ещё раз — выход.':'➖ Режим удаления выключен.');};
-$('edCancel').onclick = () => {$('ovEdit').hidden = true;S.debug = false; $('btnDebug').classList.remove('on'); $('btnAdd').hidden = true; $('btnDel').hidden = true; $('btnTest').hidden = true; renderDebug(); updateGame()};
+$('edCancel').onclick = () => {
+  $('ovEdit').hidden = true;
+};
 $('btnFailRetry').onclick=startBonus;
 $('btnBonusStart').onclick = startBonus;
 $('btnBonusLater').onclick = () => { $('ovBonus').hidden = true; updateGame(); };
