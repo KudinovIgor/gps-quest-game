@@ -1525,7 +1525,14 @@ function mk(q,label,cls,color){
     zIndexOffset:500,draggable:true
   }).bindTooltip(label+'. '+q.title+' | id='+q.id+' | тяни=перенос, клик=редактор',{direction:'top',offset:[0,-10]}).addTo(debugLayer);
   m.on('dragend',()=>{const p=m.getLatLng();q.lat=p.lat;q.lng=p.lng;onQuestMoved(q,label);});
-  m.on('click',()=>{ if(S.delMode){ if(typeof delById==='function')delById(q,label); } else openPointEditor(q,q.stage_id); });
+  m.on('click', (e) => {
+  L.DomEvent.stopPropagation(e);  // ← не даём клику дойти до карты
+  if (S.delMode) {
+    if (typeof delById === 'function') delById(q, label);
+  } else if (typeof openPointEditor === 'function') {
+    openPointEditor(q, q.stage_id);
+  }
+  });
 }
  
 // Обновим toggleDebug, чтобы показывать/скрывать кнопку "Этапы"
@@ -1991,7 +1998,7 @@ function renderCard() {
   const p = S.arrivalPoint || t;
 
   // === КВЕСТ ПРОЙДЕН ===
-  const allPointsTaken = S.points.length > 0 && S.opened.size === S.points.length;
+  const allPointsTaken = S.points.length > 0 && S.points.every(p => S.opened.has(String(p.id)));
   if (allPointsTaken && !S.cardLocked && S.phase !== 'won') {
     S.cardMode = 'done';
     $('card').classList.add('centered');
@@ -2409,6 +2416,8 @@ function applyScenario(meta, quests, stages, note){
   loadProg();
   S.stages = stages || [];
   S.points=quests;
+  S.opened = new Set([...S.opened].filter(id => S.points.some(p => String(p.id) === id)));
+  saveProg();
   S.foxSig=null;S.foxHist=[];S.foxTarget=null;S.foxQuiz=null;S.story=null;S.foxDonePending=false;S.bonusQuiz=null;S.foxSel=null;S.shownQid=null;
   stopFoxAudio();
   if(S.mode==='fox'){ if(foxes().some(q=>!S.opened.has(String(q.id)))) setMode('fox'); else setMode('map'); }
