@@ -60,7 +60,7 @@ header {
 #ovPointEdit .ed::-webkit-scrollbar-thumb { background: #1d4a63; border-radius: 3px; }
 
 /* ===== Окно "Этапы квеста" ===== */
-.stages-box {  max-width: 90vw; width: 90%; max-height: 92vh; padding: 20px;  display: flex; flex-direction: column; text-align: initial;  overflow: hidden; background: linear-gradient(170deg, #0d1626, #0a1a2c)}
+.stages-box {  max-width: none; calc(100%-40px); margin: 0 20px; max-height: 92vh; padding: 20px;  display: flex; flex-direction: column; text-align: initial;  overflow: hidden; background: linear-gradient(170deg, #0d1626, #0a1a2c)}
 .stages-box h2 {  margin: 0; padding: 14px 16px; text-align: center; color: var(--cy);  font-size: 18px; border-bottom: 1px solid #16324a; flex: 0 0 auto}
 .stages-scroll {  flex: 1; overflow-y: auto; padding: 10px 14px;  scrollbar-gutter: stable; -webkit-overflow-scrolling: touch;}
 .stages-box > button {  flex: 0 0 auto; width: calc(100% - 28px); margin: 0 14px 10px;  border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 700;  cursor: pointer; border: 0}
@@ -941,6 +941,51 @@ function renderStagesEditor() {
     stageEl.appendChild(pointsList);
     container.appendChild(stageEl);
   });
+  // === ТОЧКИ БЕЗ ЭТАПА (сироты) ===
+  const orphans = (S.points || []).filter(p => p.stage_id == null);
+  if (orphans.length) {
+    const block = document.createElement('div');
+    block.className = 'stage-block';
+
+    const header = document.createElement('div');
+    header.className = 'stage-header';
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'stage-title';
+    titleSpan.innerHTML = `<b>—</b> Без этапа <span class="stage-type">(сироты: ${orphans.length})</span>`;
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'icon-btn toggle-btn';
+    toggleBtn.textContent = '▶';
+
+    const pointsList = document.createElement('div');
+    pointsList.className = 'stage-points';
+
+    orphans.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'point-row';
+      row.dataset.pointId = p.id;
+
+      const name = document.createElement('span');
+      name.className = 'point-name';
+      name.textContent = `❓ ${p.title}`;
+      name.onclick = () => openPointEditor(p, null);
+
+      const edit = makeIconBtn('✏', 'Редактировать', () => openPointEditor(p, null));
+
+      row.appendChild(name);
+      row.appendChild(edit);
+      pointsList.appendChild(row);
+    });
+
+    toggleBtn.onclick = () => toggleStage(block, pointsList, toggleBtn);
+
+    header.appendChild(titleSpan);
+    header.appendChild(toggleBtn);
+    block.appendChild(header);
+    block.appendChild(pointsList);
+    container.appendChild(block);
+  }
 }
 
 function makeIconBtn(icon, title, onclick) {
@@ -1912,7 +1957,8 @@ function renderCard() {
   const p = S.arrivalPoint || t;
 
   // === КВЕСТ ПРОЙДЕН ===
-  const allPointsTaken = S.points.length > 0 && S.points.every(p => S.opened.has(String(p.id)));
+  const routePoints = S.points.filter(p => p.stage_id != null);
+  const allPointsTaken = routePoints.length > 0 && routePoints.every(p => S.opened.has(String(p.id)));
   if (allPointsTaken && !S.cardLocked && S.phase !== 'won') {
     S.cardMode = 'done';
     $('card').classList.add('centered');
