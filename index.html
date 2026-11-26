@@ -1959,11 +1959,11 @@ function renderCard() {
   // === КВЕСТ ПРОЙДЕН ===
   const routePoints = S.points.filter(p => p.stage_id != null);
   const allPointsTaken = routePoints.length > 0 && routePoints.every(p => S.opened.has(String(p.id)));
-  if (allPointsTaken && !S.cardLocked && S.phase !== 'won') {
+  if (allPointsTaken && !S.cardLocked && !S.questDoneAck && S.phase !== 'won') {
     S.cardMode = 'done';
     $('card').classList.add('centered');
     T.textContent = '🎉 Квест пройден!';
-    D.textContent = 'Ты открыл все точки маршрута. Нажми «Далее», чтобы увидеть весь путь.';
+    D.textContent = 'Открыты все точки маршрута! Нажми «Далее», чтобы увидеть весь путь.';
     BC.hidden = false;
     if (Dist) Dist.textContent = '';
     return;
@@ -2570,14 +2570,13 @@ $('btnStoryNext').onclick=()=>{
 };
 
 $('btnCardContinue').onclick = () => {
-  // --- Карточка «Квест пройден»: показать весь маршрут ---
+  // --- Карточка «Квест пройден»: показать весь маршрут и скрыть карточку ---
   if (S.cardMode === 'done') {
     S.questDoneAck = true;
     S.cardMode = 'walking';
     const allCoords = S.points.map(q => [q.lat, q.lng]);
     if (allCoords.length) map.fitBounds(L.latLngBounds(allCoords), { padding: [60, 60] });
-    $('card').classList.remove('centered');
-    updateGame();
+    $('card').hidden = true;  // ← скрываем карточку полностью
     return;
   }
   // --- Обычный режим: засчитать точку карточки ---
