@@ -1808,7 +1808,15 @@ function foxTick(){
 
 function checkArrival() {
   if (!S.pos) return;
-  if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
+  if (S.dismissedPointId != null) {
+    const dp = S.points.find(q => String(q.id) === S.dismissedPointId);
+    if (!dp || distM(S.pos[0], S.pos[1], dp.lat, dp.lng) > (dp.radius || CONFIG.arriveRadius)) {
+      S.dismissedPointId = null;   // игрок отошёл — точка снова предъявляема
+    } else {
+      return;                      // игрок всё ещё у отклонённой точки — тишина
+    }
+  }
+  //if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return; вовзрат карточки через 3 секунды
   if (S.cardLocked && S.arrivalPoint) {
     const d0 = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
     if (d0 > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
@@ -1844,10 +1852,6 @@ function checkArrival() {
     // ===== ДИАГНОСТИКА =====
     console.log('[bonus-hit] p=', p.title, 'd=', Math.round(d),
       'radius=', (p.radius||40), 'answer=[' + p.answer + ']', 'pType=', pType);
-    // =======================
-    //if (!p.answer || !p.answer.trim()) {
-//      if (S.mode === 'fox')    { captureFox(p); return; }
-    //}
   
     // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
     S.arrived = true;
@@ -1989,6 +1993,7 @@ function renderCard() {
   // === КВЕСТ ПРОЙДЕН ===
   const allPointsTaken = S.points.length > 0 && S.opened.size === S.points.length;
   if (allPointsTaken && !S.cardLocked && S.phase !== 'won') {
+    S.cardMode = 'done';
     $('card').classList.add('centered');
     T.textContent = '🎉 Квест пройден!';
     D.textContent = 'Ты открыл все точки маршрута. Нажми «Далее», чтобы увидеть весь путь.';
@@ -2010,7 +2015,7 @@ function renderCard() {
   }
   
   // === РЕЖИМ WALKING (идём к точке) ===
-  if (!S.cardLocked && !S.atPoint) {
+  if (!S.cardLocked) {
     $('card').classList.remove('centered');
     if (!t) {
       const st = currentStage();
@@ -2598,7 +2603,7 @@ $('btnStoryNext').onclick=()=>{
 $('btnCardContinue').onclick = () => {
   // --- Карточка «Квест пройден»: показать весь маршрут ---
   if (S.cardMode === 'done') {
-    S.questDoneAck = trыue;
+    S.questDoneAck = true;
     S.cardMode = 'walking';
     const allCoords = S.points.map(q => [q.lat, q.lng]);
     if (allCoords.length) map.fitBounds(L.latLngBounds(allCoords), { padding: [60, 60] });
@@ -2621,9 +2626,10 @@ $('btnCardClose').onclick = () => {
   S.cardLocked = false;
   S.cardMode = 'walking';
   S.arrived = false;
+  S.atPoint = false;
   S.arrivalPoint = null;
   S.foxQuiz = null;
-  S.cardCooldownUntil = Date.now() + 3000;  // ← ДОБАВИТЬ
+  //S.cardCooldownUntil = Date.now() + 3000;  // возврат карточки через 3 секундв после крестика
   $('card').classList.remove('centered');
   updateGame();
 };
