@@ -2598,7 +2598,7 @@ $('btnStoryNext').onclick=()=>{
 $('btnCardContinue').onclick = () => {
   // --- Карточка «Квест пройден»: показать весь маршрут ---
   if (S.cardMode === 'done') {
-    S.questDoneAck = true;
+    S.questDoneAck = trыue;
     S.cardMode = 'walking';
     const allCoords = S.points.map(q => [q.lat, q.lng]);
     if (allCoords.length) map.fitBounds(L.latLngBounds(allCoords), { padding: [60, 60] });
@@ -2606,7 +2606,6 @@ $('btnCardContinue').onclick = () => {
     updateGame();
     return;
   }
-
   // --- Обычный режим: засчитать точку карточки ---
   const p = S.arrivalPoint || target();
   if (!p) return;
