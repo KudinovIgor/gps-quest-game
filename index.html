@@ -1347,6 +1347,7 @@ function currentStage(){
 
 function checkArrival() {
   if (!S.pos) return;
+    console.log('[check] mode=', S.mode, 'foxSel=', S.foxSel?.id, 'cardLocked=', S.cardLocked, 'foxTarget=', S.foxTarget?.id);
   if (S.cardMode === 'sequence-error') return;
   if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
   if (S.dismissedPointId != null) {
@@ -1410,6 +1411,8 @@ function checkArrival() {
       p = target();
     }
   }
+  
+  console.log('[check] p=', p?.title, 'pType=', p ? getPointType(p) : 'null');
 
   if (!p || S.opened.has(String(p.id))) return;
 
