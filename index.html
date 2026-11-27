@@ -1358,10 +1358,13 @@ function checkArrival() {
     }
   }
   //if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return; вовзрат карточки через 3 секунды
-  if (S.cardLocked && S.arrivalPoint) {
-    const d0 = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
-    if (d0 > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
-      S.cardLocked = false; S.cardMode = 'walking'; S.arrived = false; S.arrivalPoint = null;
+  if (S.cardLocked && S.arrivalPoint && S.mode !== 'fox') {
+    const d = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
+    if (d > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
+      S.cardLocked = false;
+      S.cardMode = 'walking';
+      S.arrived = false;
+      S.arrivalPoint = null;
     } else return;
   }
 
