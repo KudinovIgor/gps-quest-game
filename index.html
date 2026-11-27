@@ -137,6 +137,7 @@ header {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.7); }
   50% { box-shadow: 0 0 0 12px rgba(255, 140, 0, 0); }
 }
+.pulse.seq-pulse {background: rgba(255, 140, 0, 0.35); border-color: #ff8c00; animation: pul 1.6s infinite}
 
 #card {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px;
@@ -917,27 +918,51 @@ function initMap(){
 }
 
 function refreshMarkers(){
-  const t=(S.phase==='main'&&!S.fact)?target():null; // во время экрана факта следующая точка не светится
-  if(t){
+  const t=(S.phase==='main'&&!S.fact)?target():null;
+  
+  // === SEQUENCE-ЭТАП: определяем, нужен ли спец-режим ===
+  const st = currentStage();
+  const isSequence = st && (st.rule_type === 'sequence');
+  const seqPts = isSequence ? sequencePoints() : [];
+  
+  // Стандартный target/zone — только НЕ для sequence
+  if(t && !isSequence){
     targetMark.setLatLng([t.lat,t.lng]); targetMark.setOpacity(1);
     zoneCircle.setLatLng([t.lat,t.lng]); zoneCircle.setRadius(t.radius);
     zoneCircle.setStyle(S.atPoint
-      ? {color:'#00ff66',fillColor:'#00ff66',opacity:.9,fillOpacity:.15}   // ты внутри зоны
-      : {color:'#00e5ff',fillColor:'#00e5ff',opacity:.9,fillOpacity:.08}); // ещё идёшь
+      ? {color:'#00ff66',fillColor:'#00ff66',opacity:.9,fillOpacity:.15}
+      : {color:'#00e5ff',fillColor:'#00e5ff',opacity:.9,fillOpacity:.08});
   } else {
     targetMark.setOpacity(0); zoneCircle.setStyle({opacity:0,fillOpacity:0});
   }
+  
   /* --- взятые точки: зелёные галочки + трейл в порядке взятия --- */
   openedLayer.clearLayers();
-  const openedQs=[...S.opened]                      // Set помнит порядок добавления = порядок взятия!
+  const openedQs=[...S.opened]
     .map(id=>S.points.find(q=>String(q.id)===String(id)))
-    .filter(q=>q&&q.kind!=='story');                // у story координаты-заглушки, не рисуем
+    .filter(q=>q&&q.kind!=='story');
   openedQs.forEach(q=>{
     L.marker([q.lat,q.lng],{icon:L.divIcon({className:'',html:'<div class="done">✓</div>',iconSize:[22,22],iconAnchor:[11,11]}),interactive:false,zIndexOffset:200})
       .bindTooltip(q.title,{direction:'top',offset:[0,-10]})
       .addTo(openedLayer);
   });
   if(openedQs.length>1)L.polyline(openedQs.map(q=>[q.lat,q.lng]),{color:'#00ff66',weight:3,dashArray:'8 6',opacity:.75,interactive:false}).addTo(openedLayer);
+  
+  // === SEQUENCE-ЭТАП: все неоткрытые точки пульсируют оранжевым ===
+  if (isSequence) {
+    seqPts.filter(p => !S.opened.has(String(p.id))).forEach(p => {
+      L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="pulse seq-pulse"></div>',
+          iconSize: [36, 36], iconAnchor: [18, 18]
+        }),
+        interactive: false,
+        zIndexOffset: 250
+      }).addTo(openedLayer);
+    });
+  }
+  
   /* --- стрелка направления на следующую цель --- */
   let at=target();
   if(!at && S.phase==='bonus'){
@@ -946,8 +971,9 @@ function refreshMarkers(){
       const d=S.pos?distM(S.pos[0],S.pos[1],q.lat,q.lng):Infinity;
       if(d<bd){bd=d;at=q;}
     }
-  }                                              // в лисьем этапе стрелки нет: охота на слух
-  if(at&&S.pos){
+  }
+  // Для sequence-этапа стрелку НЕ рисуем — игрок сам угадывает порядок
+  if(at && S.pos && !isSequence){
     dirMark.setLatLng(S.pos);
     const b=bearing(S.pos[0],S.pos[1],at.lat,at.lng);
     const el=dirMark.getElement();
@@ -1040,31 +1066,21 @@ function renderDebug(fit){
       });
       
       // Маркеры точек
+      // Маркеры точек
       pts.forEach((q, pi) => {
         let label = (si+1)+'.'+(pi+1);
         let cls = '';
         let color = col;
         
-        // === ВИЗУАЛ SEQUENCE-ЭТАПА ===
+        // === ВИЗУАЛ SEQUENCE-ЭТАПА (отладка) ===
         if (type === 'sequence') {
-          color = '#ff8c00';  // оранжевый вместо красного
-          const isOpened = S.opened.has(String(q.id));
-          
-          if (isOpened) {
-            // Открытая точка — показываем номер порядка
-            label = String(pi + 1);
-          } else if (pi === S.sequenceIndex) {
-            // Следующая ожидаемая точка — пульсирует
-            cls = ' sequence-pulse';
-          } else {
-            // Остальные неоткрытые — просто оранжевые точки без цифр
-            label = '';
-          }
+          color = '#ff8c00';
+          label = String(pi + 1);  // ВСЕГДА номер — автор видит порядок
+          if (pi === S.sequenceIndex) cls = ' sequence-pulse';  // подсветка текущей
         }
         
         mk(q, label, cls, color);
         chain.push([q.lat, q.lng]);
-        // Круг радиуса активации точки
         const radius = q.radius || CONFIG.arriveRadius;
         L.circle([q.lat, q.lng], {
           radius: radius, color: color, weight: 1.5, opacity: 0.5, dashArray: '4 4', fillColor: color, fillOpacity: 0.06, interactive: false
