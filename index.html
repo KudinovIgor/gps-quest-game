@@ -1358,14 +1358,18 @@ function checkArrival() {
     }
   }
   //if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return; вовзрат карточки через 3 секунды
-  if (S.cardLocked && S.arrivalPoint && S.mode !== 'fox') {
-    const d = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
-    if (d > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
-      S.cardLocked = false;
-      S.cardMode = 'walking';
-      S.arrived = false;
-      S.arrivalPoint = null;
-    } else return;
+  if (S.cardLocked && S.arrivalPoint) {
+    // в fox-режиме замок держится только пока выбрана та же лиса
+    const sameFox = S.mode !== 'fox' || (S.foxSel && String(S.arrivalPoint.id) === String(S.foxSel.id));
+    if (!sameFox) {
+      // сменили лису — снимаем замок, чтобы зафиксировать новую
+      S.cardLocked = false; S.cardMode = 'walking'; S.arrived = false; S.arrivalPoint = null;
+    } else {
+      const d = distM(S.pos[0], S.pos[1], S.arrivalPoint.lat, S.arrivalPoint.lng);
+      if (d > (S.arrivalPoint.radius || CONFIG.arriveRadius)) {
+        S.cardLocked = false; S.cardMode = 'walking'; S.arrived = false; S.arrivalPoint = null;
+      } else return;   // ← вот эта строка и убивает рекурсию
+    }
   }
 
   let p = null;
@@ -1420,7 +1424,8 @@ function checkArrival() {
     S.arrived = true;
     S.arrivalPoint = p;
     S.cardLocked = true;
-    S.cardMode = (pType === 'story') ? 'story' : 'question';
+    const noAns = !p.answer || !p.answer.trim();
+    S.cardMode = (pType === 'story' || (pType === 'fox' && noAns)) ? 'story' : 'question';
     
     if (typeof ping === 'function') ping();
     updateGame();
