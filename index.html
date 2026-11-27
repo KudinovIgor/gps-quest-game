@@ -1348,6 +1348,7 @@ function currentStage(){
 function checkArrival() {
   if (!S.pos) return;
   if (S.cardMode === 'sequence-error') return;
+  if (S.cardCooldownUntil && Date.now() < S.cardCooldownUntil) return;
   if (S.dismissedPointId != null) {
     const dp = S.points.find(q => String(q.id) === S.dismissedPointId);
     if (!dp || distM(S.pos[0], S.pos[1], dp.lat, dp.lng) > (dp.radius || CONFIG.arriveRadius)) {
@@ -1913,6 +1914,15 @@ function renderCard() {
   
   const t = target();
   const p = S.arrivalPoint || t;
+
+  // === ЛИСИЙ РЕЖИМ: своя карточка ===
+  if (S.mode === 'fox' || (currentStage() && currentStage().rule_type === 'foxhunter')) {
+    $('card').classList.remove('centered');
+    T.textContent = '🦊 Охота на лис';
+    D.textContent = 'Выбери лису и иди к ней по сигналу.';
+    if (Dist) Dist.textContent = '';
+    return;
+  }  
 
   // === КВЕСТ ПРОЙДЕН ===
   const routePoints = S.points.filter(p => p.stage_id != null);
