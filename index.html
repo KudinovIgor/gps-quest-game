@@ -1347,6 +1347,7 @@ function currentStage(){
 
 function checkArrival() {
   if (!S.pos) return;
+  if (S.cardMode === 'sequence-error') return;
   if (S.dismissedPointId != null) {
     const dp = S.points.find(q => String(q.id) === S.dismissedPointId);
     if (!dp || distM(S.pos[0], S.pos[1], dp.lat, dp.lng) > (dp.radius || CONFIG.arriveRadius)) {
@@ -2722,6 +2723,7 @@ $('btnCardContinue').onclick = () => {
     S.cardMode = 'walking';
     S.cardLocked = false;
     S.arrivalPoint = null;
+    S.cardCooldownUntil = Date.now() + 10000;   // ← 10 секунд, чтобы отойти
     $('card').classList.remove('centered');
     $('btnCardClose').hidden = false;
     updateGame();
