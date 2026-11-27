@@ -1422,14 +1422,11 @@ function checkArrival() {
 
     // === ТОЧКИ БЕЗ ЗАГАДКИ ===
     if (!p.answer || !p.answer.trim()) {
-      if (S.mode === 'fox') {
-        captureFox(p);  // лиса без загадки — сразу захват
-        return;
-      }
       if (S.phase === 'bonus') {
         collect(p);  // бонус без загадки — сразу взятие
         return;
       }
+      // лиса без загадки — идёт в карточку "Лиса поймана!"
       // story и linear без загадки — идут в карточку с "Далее"
     }
 
@@ -1437,7 +1434,8 @@ function checkArrival() {
     S.arrived = true;
     S.arrivalPoint = p;
     S.cardLocked = true;
-    S.cardMode = (pType === 'story') ? 'story' : 'question';
+    const noAns = !p.answer || !p.answer.trim();
+    S.cardMode = (pType === 'story' || (pType === 'fox' && noAns)) ? 'story' : 'question';
     
     if (typeof ping === 'function') ping();
     updateGame();
@@ -1935,14 +1933,14 @@ function renderCard() {
   const t = target();
   const p = S.arrivalPoint || t;
 
-  // === ЛИСИЙ РЕЖИМ: своя карточка ===
-  if (S.mode === 'fox' || (currentStage() && currentStage().rule_type === 'foxhunter')) {
+  // === ЛИСИЙ РЕЖИМ: инструкция, только пока карточка НЕ зафиксирована ===
+  if ((S.mode === 'fox' || (currentStage() && currentStage().rule_type === 'foxhunter')) && !S.cardLocked) {
     $('card').classList.remove('centered');
     T.textContent = '🦊 Охота на лис';
     D.textContent = 'Выбери лису и иди к ней по сигналу.';
     if (Dist) Dist.textContent = '';
     return;
-  }  
+  }
 
   // === КВЕСТ ПРОЙДЕН ===
   const routePoints = S.points.filter(p => p.stage_id != null);
@@ -2021,8 +2019,13 @@ function renderCard() {
   if (img) { CI.src = img; CI.hidden = false; CI.onerror = () => CI.hidden = true; }
 
   if (S.cardMode === 'story') {
-    T.textContent = '📜 ' + p.title;
-    D.textContent = p.desc || p.description || 'Читай и нажми «Далее».';
+    if (S.mode === 'fox') {
+      T.textContent = '🦊 ' + p.title;
+      D.innerHTML = 'Лиса <b>' + p.title + '</b> поймана! Нажми «Далее».';
+    } else {
+      T.textContent = '📜 ' + p.title;
+      D.textContent = p.desc || p.description || 'Читай и нажми «Далее».';
+    }
     BC.hidden = false;
   } else if (S.cardMode === 'question') {
     const hasAns = !!(p.answer && p.answer.trim());
