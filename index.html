@@ -1411,7 +1411,7 @@ function checkArrival() {
       p = target();
     }
   }
-  
+
   console.log('[check] p=', p?.title, 'pType=', p ? getPointType(p) : 'null');
 
   if (!p || S.opened.has(String(p.id))) return;
@@ -1419,16 +1419,25 @@ function checkArrival() {
   const d = distM(S.pos[0], S.pos[1], p.lat, p.lng);
   if (d <= (p.radius || CONFIG.arriveRadius)) {
     const pType = getPointType(p);
-    // ===== ДИАГНОСТИКА =====
-    console.log('[bonus-hit] p=', p.title, 'd=', Math.round(d),
-      'radius=', (p.radius||40), 'answer=[' + p.answer + ']', 'pType=', pType);
-  
+
+    // === ТОЧКИ БЕЗ ЗАГАДКИ ===
+    if (!p.answer || !p.answer.trim()) {
+      if (S.mode === 'fox') {
+        captureFox(p);  // лиса без загадки — сразу захват
+        return;
+      }
+      if (S.phase === 'bonus') {
+        collect(p);  // бонус без загадки — сразу взятие
+        return;
+      }
+      // story и linear без загадки — идут в карточку с "Далее"
+    }
+
     // === ТОЧКИ С ЗАГАДКОЙ: фиксируем карточку ===
     S.arrived = true;
     S.arrivalPoint = p;
     S.cardLocked = true;
-    const noAns = !p.answer || !p.answer.trim();
-    S.cardMode = (pType === 'story' || (pType === 'fox' && noAns)) ? 'story' : 'question';
+    S.cardMode = (pType === 'story') ? 'story' : 'question';
     
     if (typeof ping === 'function') ping();
     updateGame();
