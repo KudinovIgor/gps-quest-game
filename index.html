@@ -1380,20 +1380,25 @@ function checkArrival() {
   } else if (S.mode === 'fox' && S.foxSel) {
     p = S.foxSel;
   } else {
-    p = target();
-  }
-
-  // === ПРОВЕРКА SEQUENCE-ЭТАПА ===
-  if (p && S.phase !== 'bonus' && S.mode !== 'fox') {
-    const st = S.stages.find(s => s.id === p.stage_id);
-    if (st && st.rule_type === 'sequence') {
+    const st = currentStage();
+    if (st && (st.rule_type || st.kind) === 'sequence') {
+      // Ищем точку, в радиусе которой реально стоит игрок (а не target()!)
       const seqPts = sequencePoints();
-      const expected = seqPts[S.sequenceIndex];
-      if (expected && String(p.id) !== String(expected.id)) {
-        // Игрок вошёл в радиус неправильной точки
-        showSequenceError(expected, seqPts);
-        return;
+      const cand = seqPts
+        .filter(q => !S.opened.has(String(q.id)))
+        .filter(q => distM(S.pos[0], S.pos[1], q.lat, q.lng) <= (q.radius || CONFIG.arriveRadius))
+        .sort((a, b) => distM(S.pos[0], S.pos[1], a.lat, a.lng) - distM(S.pos[0], S.pos[1], b.lat, b.lng))[0] || null;
+
+      if (cand) {
+        const expected = seqPts[S.sequenceIndex];
+        if (expected && String(cand.id) !== String(expected.id)) {
+          showSequenceError(expected, seqPts);   // вошёл НЕ в ту → ошибка + сброс
+          return;
+        }
       }
+      p = cand;   // совпала с ожидаемой (или ожидаемой нет) → штатная карточка
+    } else {
+      p = target();
     }
   }
 
@@ -1423,6 +1428,7 @@ function checkArrival() {
 }
 
 function showSequenceError(expected, seqPts) {
+  const reqIdx = seqPts.findIndex(p => String(p.id) === String(expected.id)) + 1;  // ← ДО сброса
   // Жёсткий сброс: удаляем все sequence-точки из opened
   seqPts.forEach(p => S.opened.delete(String(p.id)));
   S.sequenceIndex = 0;
@@ -1436,7 +1442,7 @@ function showSequenceError(expected, seqPts) {
   
   $('card').classList.add('centered');
   $('cardTitle').textContent = '❌ Ошибочка вышла!';
-  $('cardDesc').textContent = `Эта точка не №${S.sequenceIndex + 1}. Начинаем поиск последовательности точек сначала!`;
+  $('cardDesc').textContent = `Эта точка не №${reqIdx}. Начинаем поиск последовательности сначала!`;
   $('answerRow').hidden = true;
   $('btnCardContinue').hidden = false;
   $('btnCardClose').hidden = true;
@@ -1953,15 +1959,21 @@ function renderCard() {
       }
     } else {
       const st = currentStage();
+      const isSeq = st && (st.rule_type || st.kind) === 'sequence';
       const isStory = st && (st.rule_type === 'story' || st.kind === 'story');
+      if (isSeq) {
+        T.textContent = '🔍 Последовательность';
+        D.textContent = 'Среди оставшихся точек угадай следующую!';
+        if (Dist) Dist.textContent = '';   // ← дистанцию НЕ показываем
+        return;
+      }
       T.textContent = '📍 ' + t.title;
       D.textContent = isStory ? 'Подойди к кругу — откроется страница истории.' : 'Подойди к точке — там тебя ждёт загадка.';
+      if (Dist && S.pos && t) {
+        Dist.textContent = '≈ ' + Math.round(distM(S.pos[0], S.pos[1], t.lat, t.lng)) + ' м';
+      } else if (Dist) { Dist.textContent = ''; }
+      return;
     }
-    if (Dist && S.pos && t) {
-      Dist.textContent = '≈ ' + Math.round(distM(S.pos[0], S.pos[1], t.lat, t.lng)) + ' м';
-    } else if (Dist) { Dist.textContent = ''; }
-    return;
-  }
   
   // === КАРТОЧКА ЗАФИКСИРОВАНА В ЦЕНТРЕ ===
   $('card').classList.add('centered');
