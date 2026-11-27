@@ -2013,6 +2013,11 @@ function renderCard() {
     T.textContent = '✅ ' + p.title;
     D.textContent = p.comment || p.desc || 'Отлично!';
     BC.hidden = false;
+  } else if (S.cardMode === 'sequence-error') {
+    // Карточка ошибки sequence — кнопка "Далее" уже показана в showSequenceError
+    // Здесь просто убеждаемся, что она видна
+    BC.hidden = false;
+    BX.hidden = true;  // крестик не нужен, только "Далее"
   }
 
   if (Dist) { Dist.textContent = ''; }
@@ -2286,8 +2291,8 @@ function openPointEditor(point, stageId) {
   } else {
     $('pointEditTitle').textContent = '➕ Новая точка';
     $('edTitle').value = '';
-    $('edLat').value = '';
-    $('edLng').value = '';
+    $('edLat').value = S.pos ? S.pos[0].toFixed(6) : '';
+    $('edLng').value = S.pos ? S.pos[1].toFixed(6) : '';
     $('edDesc').value = '';
     $('edAnswer').value = '';
     $('edHint').value = '';
