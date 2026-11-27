@@ -132,6 +132,12 @@ header {
 #foxTrend.down { color: var(--err); }
 .foxHint { font-size: 12px; color: #6f93b5; max-width: 360px; text-align: center; }
 
+.dbg.sequence-pulse {background: #ff8c00; color: #fff; animation: seqPulse 1.5s infinite}
+@keyframes seqPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.7); }
+  50% { box-shadow: 0 0 0 12px rgba(255, 140, 0, 0); }
+}
+
 #card {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px;
   z-index: 1200; width: min(94vw, 460px); background: rgba(13,22,38,.95);
@@ -584,7 +590,8 @@ const S = {
   cardLocked: false,
   cardMode: 'walking', // 'walking' | 'story' | 'question' | 'fact'
   arrivalPoint: null,
-  questDoneAck: false // «Квест пройден» уже показали и подтвердили
+  questDoneAck: false, // «Квест пройден» уже показали и подтвердили
+  sequenceIndex: 0,  // индекс следующей ожидаемой точки в sequence-этапе
 };
 
 /* Демо-точки: используются, только пока Supabase не подключен/пуст. */
@@ -1034,12 +1041,33 @@ function renderDebug(fit){
       
       // Маркеры точек
       pts.forEach((q, pi) => {
-        mk(q, (si+1)+'.'+(pi+1), '', col);
+        let label = (si+1)+'.'+(pi+1);
+        let cls = '';
+        let color = col;
+        
+        // === ВИЗУАЛ SEQUENCE-ЭТАПА ===
+        if (type === 'sequence') {
+          color = '#ff8c00';  // оранжевый вместо красного
+          const isOpened = S.opened.has(String(q.id));
+          
+          if (isOpened) {
+            // Открытая точка — показываем номер порядка
+            label = String(pi + 1);
+          } else if (pi === S.sequenceIndex) {
+            // Следующая ожидаемая точка — пульсирует
+            cls = ' sequence-pulse';
+          } else {
+            // Остальные неоткрытые — просто оранжевые точки без цифр
+            label = '';
+          }
+        }
+        
+        mk(q, label, cls, color);
         chain.push([q.lat, q.lng]);
         // Круг радиуса активации точки
         const radius = q.radius || CONFIG.arriveRadius;
         L.circle([q.lat, q.lng], {
-          radius: radius, color: col, weight: 1.5, opacity: 0.5, dashArray: '4 4', fillColor: col, fillOpacity: 0.06, interactive: false
+          radius: radius, color: color, weight: 1.5, opacity: 0.5, dashArray: '4 4', fillColor: color, fillOpacity: 0.06, interactive: false
         }).addTo(debugLayer);
       });
       
@@ -1339,6 +1367,20 @@ function checkArrival() {
     p = target();
   }
 
+  // === ПРОВЕРКА SEQUENCE-ЭТАПА ===
+  if (p && S.phase !== 'bonus' && S.mode !== 'fox') {
+    const st = S.stages.find(s => s.id === p.stage_id);
+    if (st && st.rule_type === 'sequence') {
+      const seqPts = sequencePoints();
+      const expected = seqPts[S.sequenceIndex];
+      if (expected && String(p.id) !== String(expected.id)) {
+        // Игрок вошёл в радиус неправильной точки
+        showSequenceError(expected, seqPts);
+        return;
+      }
+    }
+  }
+
   if (!p || S.opened.has(String(p.id))) return;
 
   const d = distM(S.pos[0], S.pos[1], p.lat, p.lng);
@@ -1364,12 +1406,42 @@ function checkArrival() {
   }
 }
 
+function showSequenceError(expected, seqPts) {
+  // Жёсткий сброс: удаляем все sequence-точки из opened
+  seqPts.forEach(p => S.opened.delete(String(p.id)));
+  S.sequenceIndex = 0;
+  saveProg();
+  
+  // Показываем блокирующую карточку
+  S.cardMode = 'sequence-error';
+  S.cardLocked = true;
+  S.arrivalPoint = null;
+  S.arrived = false;
+  
+  $('card').classList.add('centered');
+  $('cardTitle').textContent = '❌ Ошибочка вышла!';
+  $('cardDesc').textContent = `Эта точка не №${S.sequenceIndex + 1}. Начинаем поиск последовательности точек сначала!`;
+  $('answerRow').hidden = true;
+  $('btnCardContinue').hidden = false;
+  $('btnCardClose').hidden = true;
+  $('cardDist').textContent = '';
+  
+  updateGame();
+}
+
 function collect(p) {
   if (!p || S.opened.has(String(p.id))) return;
   const before = currentStage();
   const beforeIdx = before ? before.idx : -1;
 
   S.opened.add(String(p.id));
+
+  // === SEQUENCE-ЭТАП: инкрементируем индекс ===
+  const st = S.stages.find(s => s.id === p.stage_id);
+  if (st && st.rule_type === 'sequence') {
+    S.sequenceIndex++;
+  }
+
   saveProg();
   S.wrong[p.id] = 0;
   
@@ -1408,6 +1480,8 @@ function collect(p) {
   if (!after || after.idx !== beforeIdx) presentStage();
   else updateGame();
 }
+
+
 
 function submitAnswer() {
   // --- Ветка: загадка лисы ---
@@ -1717,6 +1791,14 @@ function updateBonusUI() {
   
 function loop(ts){if(!$('radarView').hidden)drawRadar(ts);requestAnimationFrame(loop);}
 
+const sequencePoints = () => {
+  const st = currentStage();
+  if (!st || st.rule_type !== 'sequence') return [];
+  return S.points
+    .filter(p => p.stage_id === st.id)
+    .sort((a, b) => (a.stage_order || 0) - (b.stage_order || 0));
+};
+
 /* ---------- режимы, UI ---------- */
 function setMode(m){
   // Лисий этап: нельзя выйти, пока не пойманы все лисы (кроме 🐞)
@@ -1966,7 +2048,9 @@ function updateGame(){
         }
       }
     } else { S.foxTarget=null;S.foxD=Infinity; }
-  } else if(S.mode==='fox'){ S.foxTarget=null;S.foxD=Infinity; }
+  } else if(S.mode==='fox'){ 
+    S.foxTarget=null;S.foxD=Infinity; 
+  }
   const rel=(S.fact||S.bonusQuiz)?[]:((S.phase==='bonus')?bs.filter(q=>!S.opened.has(String(q.id))):ms.filter(q=>!S.opened.has(String(q.id))));
   S.blips=S.pos?rel.map(q=>({d:distM(S.pos[0],S.pos[1],q.lat,q.lng),b:bearing(S.pos[0],S.pos[1],q.lat,q.lng),t:q.title})).sort((a,b)=>a.d-b.d):[];
   S.maxRange=Math.max(300,...S.blips.map(x=>x.d))*1.15;
@@ -1986,6 +2070,13 @@ function presentStage(){
     S.foxSel=null; S.foxSig=null; S.foxHist=[]; S.foxTarget=null; S.foxD=Infinity;
     setMode('fox');
     return;
+  }
+  // === СБРОС SEQUENCE-ИНДЕКСА ПРИ СТАРТЕ ЭТАПА ===
+  if (t === 'sequence') {
+    S.sequenceIndex = 0;
+    // Убедимся, что все sequence-точки не открыты
+    sequencePoints().forEach(p => S.opened.delete(String(p.id)));
+    saveProg();
   }
     // linear / story / sequence / flashlight — все ведут к точке на КАРТЕ
   if (S.mode !== 'map' && !S.lockRadar) setMode('map');
@@ -2511,7 +2602,7 @@ $('edDeletePoint').onclick = async () => {
   toast('🗑 Точка удалена из БД');
 };
 
-// кнопкf "+ Новый этап"
+// кнопка "+ Новый этап"
 $('btnAddStage').onclick = () => openStageEditor(null);
 
 $('btnMap').onclick=()=>setMode('map');
@@ -2597,6 +2688,16 @@ $('btnStoryNext').onclick=()=>{
 };
 
 $('btnCardContinue').onclick = () => {
+  // --- Карточка ошибки sequence ---
+  if (S.cardMode === 'sequence-error') {
+    S.cardMode = 'walking';
+    S.cardLocked = false;
+    S.arrivalPoint = null;
+    $('card').classList.remove('centered');
+    $('btnCardClose').hidden = false;
+    updateGame();
+    return;
+  }  
   // --- Карточка «Квест пройден»: показать весь маршрут и скрыть карточку ---
   if (S.cardMode === 'done') {
     S.questDoneAck = true;
